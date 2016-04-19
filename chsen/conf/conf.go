@@ -8,7 +8,7 @@ type Conf struct {
 	MaxNumOfRooms   	int32	`json:"numberOfRooms"`
 }
 
-func NewConf() *Conf {
+func DefaultConf() *Conf {
 	return &Conf{
 
 	}

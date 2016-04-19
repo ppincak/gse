@@ -3,9 +3,11 @@ package socket
 import (
 	"net/http"
 	"github.com/gorilla/websocket"
-	"com.grid/chsen/chsen/stats"
 	"com.grid/chsen/chsen/conf"
 	"github.com/sirupsen/logrus"
+	"com.grid/chsen/chsen/analytics"
+	"sync"
+	"errors"
 )
 
 const(
@@ -22,81 +24,75 @@ type Server struct {
 	// map of all server listeners
 	listeners map[string] []EventCallback
 	// broadcast channel
-	brdc      chan *broadcastMessage
-	// channel for outside communication
-	Cmdc      <-chan *Command
+	brdc      chan *transportmessage
 	// events channel
 	evc       chan *event
-	// management channel
-	mngc      chan *management
+	// listeners registration channel
+	liregc    chan listenerMessage
+	// registration channel
+	regc      chan *Client
+	// un registration channel
+	unregc    chan *Client
 	// channel for providing status
 	statc     chan chan Status
 	// channel for server stopping
 	stopc     chan struct{}
+	// mutex
+	mtx		  *sync.RWMutex
+
 
 	// server configuration
 	conf      *conf.Conf
 	// server stats
-	stats     *stats.Stats
+	stats     *analytics.Stats
 }
 
 type Status struct {
-	Clients 	int		`json:"clients"`
-	Rooms   	int		`json:"rooms"`
+	ServerName  string		`json:"serverName"`
+	Clients 	int			`json:"clients"`
+	Rooms   	int			`json:"rooms"`
 }
 
-func NewServer(conf *conf.Conf) *Server {
-	if conf == nil {
-
+func NewServer(config *conf.Conf) *Server {
+	if config == nil {
+		config = conf.DefaultConf()
 	}
 
 	upgrader := &websocket.Upgrader{
-		ReadBufferSize: ReadBufferSize,
-		WriteBufferSize: WriteBufferSize,
+		ReadBufferSize: 	ReadBufferSize,
+		WriteBufferSize: 	WriteBufferSize,
 	}
 
 	return &Server {
-		upgrader: upgrader,
-		rooms: make(map[string]*Room),
-		clients: make(map[string]*Client),
-		brdc: make(chan *broadcastMessage),
-		Cmdc: make(chan *Command),
-		mngc: make(chan *management),
-		statc: make(chan chan Status),
-		stopc: make(chan struct{}),
-		stats: stats.NewStats(),
-		conf: conf,
+		upgrader: 	upgrader,
+		rooms: 		make(map[string]*Room),
+		clients: 	make(map[string]*Client),
+		listeners: 	make(map[string] []EventCallback),
+		brdc: 		make(chan *transportmessage),
+		evc: 		make(chan *event),
+		liregc: 	make(chan listenerMessage),
+		statc: 		make(chan chan Status),
+		regc:  		make(chan *Client),
+		unregc: 	make(chan *Client),
+		stopc: 		make(chan struct{}),
+		mtx: 		new(sync.RWMutex),
+		stats: 		analytics.NewStats(),
+		conf: 		config,
 	}
 }
 
 func (server *Server) Run() {
 	for {
 		select {
-			case cmd := <- server.Cmdc:
-				roomName := cmd.Data.(string)
-
-				switch cmd.CmdType {
-					case CreateRoom:
-						room := NewRoom(server, roomName)
-						go room.Run()
-						server.rooms[room.Uid] = room
-						/*cmd.OutputC <- &ServerCommand {
-
-						}*/
-					case DestroyRoom:
-						if room, ok := server.rooms[cmd.Data]; ok {
-							room.notifyClients()
-							room.Stop()
-							delete(server.rooms, roomName)
-						}
-				}
-			case mng := <- server.mngc:
-				client := mng.client
-				switch mng.msgType {
-					case addClient:
-						server.clients[client.uid] = client
-					case removeClient:
-						delete(server.clients, client.uid)
+			case client := <- server.regc:
+				server.clients[client.uid] = client
+			case client := <- server.unregc:
+				delete(server.clients, client.uid)
+			case msg := <- server.liregc:
+				if listeners, ok := server.listeners[msg.event]; ok {
+					server.listeners[msg.event] = append(listeners, msg.callback)
+				} else {
+					server.listeners[msg.event] = []EventCallback {msg.callback}
 				}
 			case evt := <- server.evc:
 				if listeners, ok := server.listeners[evt.name]; ok{
@@ -122,7 +118,10 @@ func (server *Server) Stop() {
 }
 
 func (server *Server) Listen(event string, callback EventCallback) {
-
+	server.liregc <- listenerMessage{
+		event: event,
+		callback: callback,
+	}
 }
 
 func (server *Server) getStatus() (Status) {
@@ -132,31 +131,86 @@ func (server *Server) getStatus() (Status) {
 	}
 }
 
-func (server *Server) getStats() (stats.Stats) {
+func (server *Server) getStats() (analytics.Stats) {
 	return *server.stats
 }
 
-func (server *Server) addClient(client *Client) {
-	server.mngc <- &management{
-		msgType: addClient,
-		client: client,
+func (server *Server) createRoom(roomName string) string {
+	server.mtx.Lock()
+	room := NewRoom(server, roomName)
+	server.rooms[room.uuid] = room
+	server.mtx.Unlock()
+	return room.uuid
+}
+
+func (server *Server) getRoom(roomName string) (*Room, error) {
+	server.mtx.RLock()
+	for _, room := range server.rooms {
+		if room.Name == roomName {
+			server.mtx.RUnlock()
+			return room, nil
+		}
 	}
-	server.stats.Inc(stats.OpenedClients)
+	server.mtx.RUnlock()
+	return nil, errors.New("Room not found")
+}
+
+func (server *Server) deleteRoom(roomName string) {
+	server.mtx.Lock()
+	for _, room := range server.rooms {
+		if room.Name == roomName {
+			room.DestroyRoom()
+			delete(server.rooms, roomName)
+			return
+		}
+	}
+	server.mtx.Unlock()
+}
+
+func (server *Server) joinRoom(roomName string, client *Client) {
+	server.mtx.RLock()
+	for _, room := range server.rooms {
+		if room.Name == roomName {
+			room.addClient(client)
+			client.joinRoom(room)
+			server.mtx.RUnlock()
+			return
+		}
+	}
+	server.mtx.RUnlock()
+}
+
+func (server *Server) addClient(client *Client) {
+	server.regc <- client
+	server.stats.Inc(analytics.OpenedClients)
 }
 
 func (server *Server) removeClient(client *Client) {
-	server.mngc <- &management{
-		msgType: removeClient,
-		client: client,
-	}
-	server.stats.Inc(stats.ClosedClients)
+	server.unregc <- client
+	server.stats.Inc(analytics.ClosedClients)
 }
 
-func (server *Server) serveWebsocket(w http.ResponseWriter, r *http.Request) {
+func (server *Server) serveWebSocket(w http.ResponseWriter, r *http.Request) {
 	ws, err := server.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
 	server.addClient(NewClient(server, ws))
+}
+
+func (client *Client) Set(key string, value interface{}) {
+	client.store.Set(key, value)
+}
+
+func (client *Client) Get(key string) interface{} {
+	return client.store.Get(key)
+}
+
+func (client *Client) Delete(key string) {
+	client.store.Delete(key)
+}
+
+func (client *Client) Has(key string) bool {
+	return client.store.Has(key)
 }

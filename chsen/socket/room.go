@@ -2,76 +2,71 @@ package socket
 
 import (
 	"com.grid/chsen/chsen/utils"
+	"sync"
 )
 
 type Room struct {
-	server  	*Server
-	Uid     	string
+	server  *Server
+	uuid    string
 	// name of the room
-	Name    	string
-	clients 	map[string]*Client
-	brc     	chan *broadcastMessage
-	mngc    	chan *management
-	stopc   	chan struct{}
+	Name    string
+	// all the clients int the room
+	clients map[string]*Client
+	// mutex
+	mtx     *sync.RWMutex
 }
 
 func NewRoom(server *Server, name string) *Room {
 	return &Room{
 		server: 	server,
-		Uid: 		utils.GenerateUID(),
+		uuid: 		utils.GenerateUID(),
 		Name: 		name,
 		clients: 	make(map[string]*Client),
-		brc: 		make(chan *broadcastMessage),
-		mngc:	make(chan *management),
-		stopc: 		make(chan struct{}),
+		mtx: 		new(sync.RWMutex),
 	}
-}
-
-func (room *Room) Run() {
-	for {
-		select {
-			case msg := <-room.mngc:
-				client := msg.client
-				switch msg.msgType {
-					case addClient:
-						room.clients[client.uid] = client
-					case removeClient:
-						delete(room.clients, client.uid)
-				}
-			case br := <- room.brc:
-				room.broadcast(br)
-			case <- room.stopc:
-				return
-		}
-	}
-}
-
-func (room *Room) Stop() {
-	room.stopc <- struct{}{}
 }
 
 func (room *Room) addClient(client *Client) {
-	room.mngc <- &management{
-		msgType: addClient,
-		client: client,
-	}
+	room.mtx.Lock()
+	room.clients[client.uid] = client
+	room.mtx.Unlock()
 }
 
 func (room *Room) removeClient(client *Client) {
-	room.mngc <- &management{
-		msgType: removeClient,
-		client: client,
+	room.mtx.Lock()
+	delete(room.clients, client.uid)
+	room.mtx.Unlock()
+}
+
+func (room *Room) GetClients() []*Client {
+	room.mtx.Lock()
+	clients := make([]*Client, len(room.clients))
+	i := 0
+	for _, client := range room.clients {
+		clients[i] = client
+	}
+	room.mtx.Unlock()
+	return clients
+}
+
+func (room *Room) Disconnect() {
+	for _, client := range room.clients {
+		client.leaveRoom(room)
 	}
 }
 
-func (room *Room) notifyClients() {
+func (room *Room) DestroyRoom() {
 	for _, client := range room.clients {
-		client.leaveRoom(room.Uid)
+		client.leaveRoom(room)
 	}
+
+	room.mtx.Lock()
+	room.clients = make(map[string] *Client);
+	room.mtx.Unlock()
 }
 
-func (room *Room) broadcast(br *broadcastMessage) {
+func (room *Room) SendEvent(event string, data interface{}) {
 	for _, client := range room.clients {
-		client.sendMessage(br)
+		client.SendEvent(event, data)
 	}
 }

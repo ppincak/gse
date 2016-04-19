@@ -3,16 +3,10 @@ package socket
 import (
 	"github.com/gorilla/websocket"
 	"com.grid/chsen/chsen/utils"
-	"errors"
 	"encoding/json"
-	"com.grid/chsen/chsen/stats"
-
 	"sync"
+	"com.grid/chsen/chsen/store"
 )
-
-type Processor interface {
-	Process(in <-chan []byte, out chan<- []byte)
-}
 
 type Client struct {
 	// pointer to server
@@ -22,19 +16,13 @@ type Client struct {
 	// websocket connection
 	ws     *websocket.Conn
 	// storage space
-	store  map[string]interface{}
+	store  socket.Store
 	// rooms to which the client is connected
 	rooms  map[string]*Room
-	// management channel
-	mngc   chan *management
-	// reader channel
-	rc     chan []byte
 	// writer channel
 	wc     chan []byte
-
+	// write mutex
 	mtx    *sync.RWMutex
-
-	proc   Processor
 }
 
 func NewClient(server  *Server, ws *websocket.Conn) (*Client) {
@@ -43,23 +31,18 @@ func NewClient(server  *Server, ws *websocket.Conn) (*Client) {
 		uid: 	utils.GenerateUID(),
 		ws: ws,
 		rooms: 	make(map[string] *Room),
-		mngc: make(chan *management),
-		rc: make(chan []byte),
 		wc: make(chan []byte),
 		mtx: new(sync.RWMutex),
 	};
 }
 
-func (client *Client) Run() {
-	go client.readPump()
-	go client.writePump()
-
-	for {
-		select {
-			case msg := <- client.rc:
-				msg = msg
-			}
+func(client *Client) processMessage(rawMsg []byte) (*transportmessage, error) {
+	var tmsg transportmessage
+	err := json.Unmarshal(rawMsg, &tmsg)
+	if err != nil {
+		return nil, err
 	}
+	return &tmsg, nil
 }
 
 // pump for reading
@@ -72,7 +55,17 @@ func (client *Client) readPump() {
 				return
 			}
 		}
-		client.rc <-msg
+		tmsg, err := client.processMessage(msg)
+		if err != nil {
+			continue
+		}
+
+		evt := &event{
+			name: tmsg.Event,
+			client: client,
+			data: tmsg.Data,
+		}
+		client.server.evc <-evt
 	}
 }
 
@@ -95,16 +88,31 @@ func (client *Client) destroyClient() {
 	client.ws.Close()
 }
 
-func (client *Client) joinRoom(room *Room) {
-	client.mtx.Lock()
-	client.rooms[room.Uid] = room
-	client.mtx.Unlock()
+func (client *Client) JoinRoom(roomName string) {
+
 }
 
-func (client *Client) leaveRoom(roomId string) {
+func (client *Client) joinRoom(room *Room) {
 	client.mtx.Lock()
-	delete(client.rooms, roomId);
+	client.rooms[room.uuid] = room
 	client.mtx.Unlock()
+	room.addClient(client)
+}
+
+func (client *Client) LeaveRoom(roomName string) {
+	for _, room := range client.rooms {
+		if room.Name == roomName {
+			client.leaveRoom(room)
+			return
+		}
+	}
+}
+
+func (client *Client) leaveRoom(room *Room) {
+	client.mtx.Lock()
+	delete(client.rooms, room.uuid);
+	client.mtx.Unlock()
+	room.removeClient(client)
 }
 
 func (client *Client) leaveAllRooms() {
@@ -117,42 +125,29 @@ func (client *Client) leaveAllRooms() {
 	client.mtx.Unlock()
 }
 
-func (client *Client) set(key string, value interface{}) {
-	client.mtx.Lock()
-	client.store[key] = value
-	client.mtx.Unlock()
+// send message to client connection
+func (client *Client) sendMessage(tmsg *transportmessage) {
+	raw, err := json.Marshal(tmsg)
+	if err != nil {
+		// log error
+	}
+	client.wc <- raw
 }
 
-func (client *Client) get(key string) interface{} {
-	client.mtx.RLock()
-	val := client.store[key]
-	client.mtx.RUnlock()
-	return val
-}
-
-func (client *Client) has(key string) bool {
-	client.mtx.RLock()
-	_, ok := client.store[key]
-	client.mtx.RUnlock()
-	return ok
-}
-
-func (client *Client) del(key string) {
-	client.mtx.Lock()
-	delete(client.store, key)
-	client.mtx.Unlock()
+func (client *Client) SendEvent(event string, data interface{}) {
+	tmsg := &transportmessage{
+		Event: event,
+		Data: data,
+	}
+	raw, err := json.Marshal(tmsg)
+	if err != nil {
+		// log error
+	}
+	client.wc <- raw
 }
 
 // send message to client connection
-func (client *Client) Send(data []byte) {
+func (client *Client) SendRaw(data []byte) {
 	client.wc <- data
 }
 
-// send message to client connection
-func (client *Client) sendMessage(msg *broadcastMessage) {
-	srl, err := json.Marshal(msg)
-	if err != nil {
-		client.server.stats.Inc(stats.FailedMessages)
-	}
-	client.wc <- srl
-}
