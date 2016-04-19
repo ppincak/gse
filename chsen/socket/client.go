@@ -165,3 +165,18 @@ func (client *Client) SendRaw(data []byte) {
 	client.wc <- data
 }
 
+func (client *Client) Set(key string, value interface{}) {
+	client.store.Set(key, value)
+}
+
+func (client *Client) Get(key string) interface{} {
+	return client.store.Get(key)
+}
+
+func (client *Client) Delete(key string) {
+	client.store.Delete(key)
+}
+
+func (client *Client) Has(key string) bool {
+	return client.store.Has(key)
+}
