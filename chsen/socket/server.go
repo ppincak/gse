@@ -85,9 +85,9 @@ func (server *Server) Run() {
 	for {
 		select {
 			case client := <- server.regc:
-				server.clients[client.uid] = client
+				server.clients[client.uuid] = client
 			case client := <- server.unregc:
-				delete(server.clients, client.uid)
+				delete(server.clients, client.uuid)
 			case msg := <- server.liregc:
 				if listeners, ok := server.listeners[msg.event]; ok {
 					server.listeners[msg.event] = append(listeners, msg.callback)

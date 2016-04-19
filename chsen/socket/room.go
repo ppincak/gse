@@ -28,13 +28,13 @@ func NewRoom(server *Server, name string) *Room {
 
 func (room *Room) addClient(client *Client) {
 	room.mtx.Lock()
-	room.clients[client.uid] = client
+	room.clients[client.uuid] = client
 	room.mtx.Unlock()
 }
 
 func (room *Room) removeClient(client *Client) {
 	room.mtx.Lock()
-	delete(room.clients, client.uid)
+	delete(room.clients, client.uuid)
 	room.mtx.Unlock()
 }
 

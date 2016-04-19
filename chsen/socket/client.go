@@ -12,7 +12,7 @@ type Client struct {
 	// pointer to server
 	server *Server
 	// uid of the room
-	uid    string
+	uuid   string
 	// websocket connection
 	ws     *websocket.Conn
 	// storage space
@@ -28,7 +28,7 @@ type Client struct {
 func NewClient(server  *Server, ws *websocket.Conn) (*Client) {
 	return &Client{
 		server: server,
-		uid: 	utils.GenerateUID(),
+		uuid: 	utils.GenerateUID(),
 		ws: ws,
 		rooms: 	make(map[string] *Room),
 		wc: make(chan []byte),
@@ -82,14 +82,28 @@ func (client *Client) writePump() {
 	}
 }
 
+// TODO figure out how to do this
+func (client *Client) Disconnect() {
+	client.destroyClient()
+}
+
+// TODO change this func
 func (client *Client) destroyClient() {
 	client.leaveAllRooms()
 	client.server.removeClient(client)
 	client.ws.Close()
 }
 
-func (client *Client) JoinRoom(roomName string) {
-
+func (client *Client) JoinRoom(roomName string) error {
+	room, err := client.server.getRoom(roomName)
+    if err != nil {
+		return err
+	}
+	room.addClient(client)
+	client.mtx.Lock()
+	client.rooms[room.uuid] = room
+	client.mtx.Unlock()
+	return nil
 }
 
 func (client *Client) joinRoom(room *Room) {
