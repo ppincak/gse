@@ -6,33 +6,37 @@ import (
 	"github.com/sirupsen/logrus"
 	"sync"
 	"errors"
+	"fmt"
+
+	"com.grid/chsen/gsio/store"
 )
 
-const(
-	initialLSize = 5
-
-	ReadBufferSize = 1024
-	WriteBufferSize = 1024
-)
-
-type Server struct {
-	upgrader   *websocket.Upgrader
-	// map of all connected rooms
-	rooms      map[string]*Room
-	// map of all connected clients
-	clients    map[string]*Client
-	// event listeners
+type listeners struct {
 	listeners  map[string] []EventCallback
 	//  connection callbacks
 	cListeners []ConnectCallback
 	// disconecct listeners
 	dListeners []DisconnectCallback
+}
+
+type Server struct {
+	upgrader   		*websocket.Upgrader
+	// map of all connected rooms
+	rooms      		map[string]*Room
+	// map of all connected clients
+	clients    		map[string]*Client
+	// event listeners
+	listeners  		map[string] []EventCallback
+	//  connection callbacks
+	cListeners 		[]ConnectCallback
+	// disconecct listeners
+	dListeners []DisconnectCallback
 	// transport channel
 	trpc       chan *transportmessage
 	// events channel
-	evc        chan *event
+	evc        chan *Event
 	// event listeners registration channel
-	liregc     chan listenerMessage
+	liregc     chan registerListener
 	// connection callbacks registration channel
 	clregc     chan ConnectCallback
 	//
@@ -43,35 +47,41 @@ type Server struct {
 	mtx        *sync.RWMutex
 	// server configuration
 	conf       *Conf
+	//
+	storeF     socket.LocalStoreFactory
 	// server stats
 	stats      *Stats
 }
 
-func NewServer(config *Conf) *Server {
+func NewServer(storeFactory socket.LocalStoreFactory, config *Conf) *Server {
+	if storeFactory == nil {
+		storeFactory = socket.NewLocalStore
+	}
 	if config == nil {
 		config = DefaultConf()
 	}
 
 	upgrader := &websocket.Upgrader{
-		ReadBufferSize: 	ReadBufferSize,
-		WriteBufferSize: 	WriteBufferSize,
+		ReadBufferSize: 	config.ReadBufferSize,
+		WriteBufferSize: 	config.WriteBufferSize,
 	}
 
 	return &Server {
 		upgrader: 		upgrader,
-		rooms: 			make(map[string]*Room),
-		clients: 		make(map[string]*Client),
+		rooms: 			make(map[string] *Room),
+		clients: 		make(map[string] *Client),
 		listeners: 		make(map[string] []EventCallback),
-		cListeners:     make([]ConnectCallback, initialLSize),
-		dListeners:     make([]DisconnectCallback, initialLSize),
+		cListeners:     make([]ConnectCallback, 0),
+		dListeners:     make([]DisconnectCallback, 0),
 		trpc: 			make(chan *transportmessage),
-		evc: 			make(chan *event),
-		liregc: 		make(chan listenerMessage),
+		evc: 			make(chan *Event),
+		liregc: 		make(chan registerListener),
 		clregc:      	make(chan ConnectCallback),
 		dlregc:      	make(chan DisconnectCallback),
 		stopc: 			make(chan struct{}),
 		mtx: 			new(sync.RWMutex),
 		stats: 			NewStats(),
+		storeF: 		storeFactory,
 		conf: 			config,
 	}
 }
@@ -90,12 +100,23 @@ func (server *Server) Run() {
 			case callback := <- server.dlregc:
 				server.dListeners = append(server.dListeners, callback)
 			case evt := <- server.evc:
-				if listeners, ok := server.listeners[evt.name]; ok{
-					for _, listener := range listeners {
-						listener(evt.client, evt.data)
-					}
+				switch evt.EventType {
+					case Connect:
+						fmt.Println( server.cListeners)
+						for _, callback := range server.cListeners{
+							go callback(evt.Client)
+						}
+					case Disconnect:
+						for _, callback := range server.dListeners{
+							go callback(evt.Client)
+						}
+					case Custom:
+						if listeners, ok := server.listeners[evt.Name]; ok{
+							for _, listener := range listeners {
+								go listener(evt.Client, evt.Data)
+							}
+						}
 				}
-				return
 			case msg := <- server.trpc:
 				for _, client := range server.clients {
 					client.sendMessage(msg)
@@ -119,7 +140,7 @@ func (server *Server) AddDisconnectListener(callback DisconnectCallback) {
 }
 
 func (server *Server) Listen(event string, callback EventCallback) {
-	server.liregc <- listenerMessage{
+	server.liregc <- registerListener{
 		event: event,
 		callback: callback,
 	}
@@ -215,6 +236,10 @@ func (server *Server) addClient(client *Client) {
 	server.clients[client.uuid] = client
 	server.mtx.Unlock()
     server.stats.Inc(OpenedClients)
+	server.evc <- &Event{
+		EventType: Connect,
+		Client: client,
+	}
 }
 
 func (server *Server) removeClient(client *Client) {
@@ -222,13 +247,20 @@ func (server *Server) removeClient(client *Client) {
 	delete(server.clients, client.uuid)
 	server.mtx.Unlock()
 	server.stats.Inc(ClosedClients)
+	server.evc <- &Event{
+		EventType: Disconnect,
+		Client: client,
+	}
 }
 
-func (server *Server) serveWebSocket(w http.ResponseWriter, r *http.Request) {
+func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	ws, err := server.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
-	server.addClient(NewClient(server, ws))
+	client := NewClient(server, ws, server.storeF())
+	go client.readPump()
+	go client.writePump()
+	server.addClient(client)
 }

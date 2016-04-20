@@ -2,16 +2,16 @@ package socket
 
 const(
 	ServerName = "default"
-	ServerHost = "localhost"
-	ServerPort = 9864
+	ReadBufferSize = 1024
+	WriteBufferSize = 1024
 	MaxNumOfClients = 10000
 	MaxNumOfRooms = 5000
 )
 
 type Conf struct {
 	ServerName  		string	`json:"serverName"`
-	ServerHost			string	`json:"serverHost"`
-	ServerPort        	int		`json:"serverPort"`
+	ReadBufferSize 		int 	`json:"readBufferSize"`
+	WriteBufferSize		int 	`json:"writeBufferSize"`
 	MaxNumOfClients 	int32 	`json:"numberOfClients"`
 	MaxNumOfRooms   	int32	`json:"numberOfRooms"`
 }
@@ -19,8 +19,8 @@ type Conf struct {
 func DefaultConf() *Conf {
 	return &Conf{
 		ServerName: ServerName,
-		ServerHost: ServerHost,
-		ServerPort: ServerPort,
+		ReadBufferSize: ReadBufferSize,
+		WriteBufferSize: WriteBufferSize,
 		MaxNumOfClients: MaxNumOfClients,
 		MaxNumOfRooms: MaxNumOfRooms,
 	}

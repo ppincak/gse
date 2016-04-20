@@ -1,6 +1,8 @@
 package socket
 
-import "sync"
+import (
+	"sync"
+)
 
 type LocalStore struct {
 	data	map[string]interface{}
@@ -38,4 +40,8 @@ func (client *LocalStore) Has(key string) bool {
 	_, ok := client.data[key]
 	client.mtx.RUnlock()
 	return ok
+}
+
+func (client *LocalStore) Destroy() {
+	client.data = make(map[string]interface{});
 }

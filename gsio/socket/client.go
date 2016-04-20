@@ -6,13 +6,15 @@ import (
 	"encoding/json"
 	"sync"
 	"com.grid/chsen/gsio/store"
+	"github.com/sirupsen/logrus"
+
 )
 
 type Client struct {
-	// pointer to server
-	server *Server
 	// uid of the room
 	uuid   string
+	// pointer to server
+	server *Server
 	// websocket connection
 	ws     *websocket.Conn
 	// storage space
@@ -25,11 +27,12 @@ type Client struct {
 	mtx    *sync.RWMutex
 }
 
-func NewClient(server  *Server, ws *websocket.Conn) (*Client) {
+func NewClient(server  *Server, ws *websocket.Conn, store socket.Store) (*Client) {
 	return &Client{
-		server: server,
 		uuid: 	utils.GenerateUID(),
+		server: server,
 		ws: ws,
+		store: store,
 		rooms: 	make(map[string] *Room),
 		wc: make(chan []byte),
 		mtx: new(sync.RWMutex),
@@ -45,12 +48,14 @@ func(client *Client) processMessage(rawMsg []byte) (*transportmessage, error) {
 	return &tmsg, nil
 }
 
-// pump for reading
+// Pump for reading
 func (client *Client) readPump() {
 	for {
 		_, msg, err := client.ws.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err) {
+			if websocket.IsCloseError(err) ||
+			   websocket.IsUnexpectedCloseError(err) {
+				logrus.Errorln("Client disconnected", err)
 				client.Disconnect()
 				return
 			}
@@ -60,16 +65,17 @@ func (client *Client) readPump() {
 			continue
 		}
 
-		evt := &event{
-			name: tmsg.Event,
-			client: client,
-			data: tmsg.Data,
+		evt := &Event{
+			EventType: Custom,
+			Name: tmsg.Event,
+			Client: client,
+			Data: tmsg.Data,
 		}
 		client.server.evc <-evt
 	}
 }
 
-// pump for writing
+// Pump for writing
 func (client *Client) writePump() {
 	for {
 		select {
@@ -82,7 +88,6 @@ func (client *Client) writePump() {
 	}
 }
 
-// TODO figure out how to do this
 func (client *Client) Disconnect() {
 	client.leaveAllRooms()
 	client.server.removeClient(client)
@@ -136,6 +141,10 @@ func (client *Client) leaveAllRooms() {
 	client.mtx.Lock()
 	client.rooms = make(map[string]*Room)
 	client.mtx.Unlock()
+}
+
+func (client *Client) connectionError() {
+	logrus.Error()
 }
 
 // send message to client connection

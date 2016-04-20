@@ -1,28 +1,40 @@
 package main
 
 import (
-
-	//"net/http"
-
-	//"com.grid/chsen/chsen/socket"
-	"runtime"
-
 	"com.grid/chsen/gsio/socket"
-
+	"fmt"
+	"net/http"
 
 )
 
-type T struct {
-	Event	string 	`json:"event"`
-	Data    interface{}  `json:"data"`
+func serveIndexHtml(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "C:\\Users\\ppincak\\go\\src\\com.grid\\chsen\\gsio\\index.html")
+}
+
+func connect(client *socket.Client) {
+	fmt.Println("connected")
 }
 
 func main() {
 
-	runtime.GOMAXPROCS(4)
- 	socket.NewServer(nil)
+ 	server := socket.NewServer(nil, nil)
+	go server.Run()
+
+	http.HandleFunc("/index", serveIndexHtml)
+	http.HandleFunc("/ws", server.ServeWebSocket)
+	server.AddConnectListener(connect)
+	server.AddDisconnectListener(func(client *socket.Client) {
+		fmt.Println("disconnected")
+	})
+	server.Listen("click", func(client *socket.Client, data interface{}) {
+		fmt.Println("event callback", data)
+		fmt.Println(client.Get("peter"))
+	})
+	http.ListenAndServe("localhost:8080", nil)
 
 
 
-	//http.ListenAndServe("localhost:8080", nil)
+	/*server.AddDisconnectListener(func(client *socket.Client) {
+		fmt.Println("disconnected")
+	})*/
 }

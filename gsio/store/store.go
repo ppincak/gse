@@ -9,6 +9,8 @@ type Store interface {
 	Delete(string)
 
 	Has(string) bool
+
+	Destroy()
 }
 
-type LocalStoreFactory func() *Store
+type LocalStoreFactory func() Store
