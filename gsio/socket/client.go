@@ -2,10 +2,10 @@ package socket
 
 import (
 	"github.com/gorilla/websocket"
-	"com.grid/chsen/chsen/utils"
+	"com.grid/chsen/gsio/utils"
 	"encoding/json"
 	"sync"
-	"com.grid/chsen/chsen/store"
+	"com.grid/chsen/gsio/store"
 )
 
 type Client struct {

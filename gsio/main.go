@@ -7,7 +7,7 @@ import (
 	//"com.grid/chsen/chsen/socket"
 	"runtime"
 
-	"com.grid/chsen/chsen/socket"
+	"com.grid/chsen/gsio/socket"
 
 
 )
