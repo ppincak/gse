@@ -1,4 +1,4 @@
-package analytics
+package socket
 
 import "sync/atomic"
 

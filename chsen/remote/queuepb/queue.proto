@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package queuepb;
+
+
+enum MessageType {
+
+}
+
+message Message {
+    required MessageType type = 1 ;
+}

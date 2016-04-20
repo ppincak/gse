@@ -38,4 +38,4 @@ func (client *LocalStore) Has(key string) bool {
 	_, ok := client.data[key]
 	client.mtx.RUnlock()
 	return ok
-
+}

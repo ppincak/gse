@@ -51,7 +51,7 @@ func (client *Client) readPump() {
 		_, msg, err := client.ws.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err) {
-				client.destroyClient()
+				client.Disconnect()
 				return
 			}
 		}
@@ -75,7 +75,7 @@ func (client *Client) writePump() {
 		select {
 			case msg := <-client.wc:
 				if err := client.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
-					client.destroyClient()
+					client.Disconnect()
 					return
 				}
 		}
@@ -84,14 +84,13 @@ func (client *Client) writePump() {
 
 // TODO figure out how to do this
 func (client *Client) Disconnect() {
-	client.destroyClient()
-}
-
-// TODO change this func
-func (client *Client) destroyClient() {
 	client.leaveAllRooms()
 	client.server.removeClient(client)
 	client.ws.Close()
+}
+
+func (client *Client) GetSessionId() string {
+	return client.uuid
 }
 
 func (client *Client) JoinRoom(roomName string) error {

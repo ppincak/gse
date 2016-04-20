@@ -33,8 +33,11 @@ func parseConfig(src []byte) (*QueueConfig, error) {
 }
 
 type Queue struct {
+
 	conn 	net.Listener
+
 	conf	*QueueConfig
+
 	out     chan []byte
 }
 
