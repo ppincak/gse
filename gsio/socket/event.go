@@ -8,13 +8,16 @@ type ConnectCallback func(*Client)
 type DisconnectCallback func(*Client)
 
 type Listenable interface {
-	// Event listening
+	// Listen to event
 	Listen(string, EventCallback)
 }
 
 type registerListener struct {
-	event 		string
-	callback	EventCallback
+	listenerType	EventType
+	event 			string
+	ConnectCallback
+	DisconnectCallback
+	EventCallback
 }
 
 type EventType int

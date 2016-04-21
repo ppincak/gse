@@ -30,27 +30,23 @@ type Server struct {
 	//  connection callbacks
 	cListeners 		[]ConnectCallback
 	// disconecct listeners
-	dListeners []DisconnectCallback
+	dListeners 		[]DisconnectCallback
 	// transport channel
-	trpc       chan *transportmessage
+	trpc       		chan *transportmessage
 	// events channel
-	evc        chan *Event
+	evc        		chan *Event
 	// event listeners registration channel
-	liregc     chan registerListener
-	// connection callbacks registration channel
-	clregc     chan ConnectCallback
-	//
-	dlregc     chan DisconnectCallback
+	liregc     		chan registerListener
 	// channel for server stopping
-	stopc      chan struct{}
+	stopc      		chan struct{}
 	// data mutex
-	mtx        *sync.RWMutex
+	mtx        		*sync.RWMutex
 	// server configuration
-	conf       *Conf
+	conf       		*Conf
 	//
-	storeF     socket.LocalStoreFactory
+	storeF     		socket.LocalStoreFactory
 	// server stats
-	stats      *Stats
+	stats      		*Stats
 }
 
 func NewServer(storeFactory socket.LocalStoreFactory, config *Conf) *Server {
@@ -76,8 +72,6 @@ func NewServer(storeFactory socket.LocalStoreFactory, config *Conf) *Server {
 		trpc: 			make(chan *transportmessage),
 		evc: 			make(chan *Event),
 		liregc: 		make(chan registerListener),
-		clregc:      	make(chan ConnectCallback),
-		dlregc:      	make(chan DisconnectCallback),
 		stopc: 			make(chan struct{}),
 		mtx: 			new(sync.RWMutex),
 		stats: 			NewStats(),
@@ -90,15 +84,18 @@ func (server *Server) Run() {
 	for {
 		select {
 			case msg := <- server.liregc:
-				if listeners, ok := server.listeners[msg.event]; ok {
-					server.listeners[msg.event] = append(listeners, msg.callback)
-				} else {
-					server.listeners[msg.event] = []EventCallback {msg.callback}
+				switch msg.listenerType {
+					case Connect:
+						server.cListeners = append(server.cListeners, msg.ConnectCallback)
+					case Disconnect:
+						server.dListeners = append(server.dListeners, msg.DisconnectCallback)
+					case Custom:
+						if listeners, ok := server.listeners[msg.event]; ok {
+							server.listeners[msg.event] = append(listeners, msg.EventCallback)
+						} else {
+							server.listeners[msg.event] = []EventCallback {msg.EventCallback}
+						}
 				}
-			case callback := <- server.clregc:
-				server.cListeners = append(server.cListeners, callback)
-			case callback := <- server.dlregc:
-				server.dListeners = append(server.dListeners, callback)
 			case evt := <- server.evc:
 				switch evt.EventType {
 					case Connect:
@@ -132,17 +129,24 @@ func (server *Server) Stop() {
 }
 
 func (server *Server) AddConnectListener(callback ConnectCallback) {
-	server.clregc <- callback
+	server.liregc <- registerListener{
+		listenerType: Connect,
+		ConnectCallback: callback,
+	}
 }
 
 func (server *Server) AddDisconnectListener(callback DisconnectCallback) {
-	server.dlregc <- callback
+	server.liregc <- registerListener{
+		listenerType: Disconnect,
+		DisconnectCallback: callback,
+	}
 }
 
 func (server *Server) Listen(event string, callback EventCallback) {
 	server.liregc <- registerListener{
+		listenerType: Custom,
 		event: event,
-		callback: callback,
+		EventCallback: callback,
 	}
 }
 
@@ -181,7 +185,7 @@ func (server *Server) getStats() (Stats) {
 	return *server.stats
 }
 
-func (server *Server) addRoom(roomName string) string {
+func (server *Server) AddRoom(roomName string) string {
 	server.mtx.Lock()
 	room := NewRoom(server, roomName)
 	server.rooms[room.uuid] = room
@@ -202,7 +206,7 @@ func (server *Server) getRoom(roomName string) (*Room, error) {
 	return nil, errors.New("Room not found")
 }
 
-func (server *Server) removeRoom(roomName string) {
+func (server *Server) RemoveRoom(roomName string) {
 	server.mtx.Lock()
 	defer server.mtx.Unlock()
 	for _, room := range server.rooms {
