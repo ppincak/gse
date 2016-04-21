@@ -4,10 +4,12 @@ import "encoding/json"
 
 var Errors = map[int]string{
 	RoomDoesNotExist: "Room doesnt exist",
+	FailedToParseMessage: "Failed to parse message",
 }
 
 const (
 	RoomDoesNotExist = iota
+	FailedToParseMessage
 )
 
 type Error struct {
@@ -21,6 +23,12 @@ func makeError(errorCode int) Error {
 		ErrorCode: errorCode,
 		Message: Errors[errorCode],
 	}
+}
+
+func makeComplexError(errorCode int, cause error) Error {
+	err := makeError(errorCode)
+	err.Cause = cause.Error()
+	return err
 }
 
 func (e Error) Error() string {

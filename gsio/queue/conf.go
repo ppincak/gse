@@ -1,7 +1,7 @@
 package queue
 
 
-type Config struct {
+type QueueConf struct {
 	Host 	string  	`json:"host"`
 	Port 	int			`json:"port"`
 }
@@ -12,8 +12,8 @@ const(
 	DefaultHost = "localhost"
 )
 
-func defaultConfig() *Config {
-	return &Config{
+func defaultConfig() *QueueConf {
+	return &QueueConf{
 		Port: DefaultPort,
 		Host: DefaultHost,
 	}

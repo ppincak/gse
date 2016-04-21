@@ -8,7 +8,7 @@ const(
 	MaxNumOfRooms = 5000
 )
 
-type Conf struct {
+type ServerConf struct {
 	ServerName  		string	`json:"serverName"`
 	ReadBufferSize 		int 	`json:"readBufferSize"`
 	WriteBufferSize		int 	`json:"writeBufferSize"`
@@ -16,8 +16,8 @@ type Conf struct {
 	MaxNumOfRooms   	int32	`json:"numberOfRooms"`
 }
 
-func DefaultConf() *Conf {
-	return &Conf{
+func DefaultConf() *ServerConf {
+	return &ServerConf{
 		ServerName: ServerName,
 		ReadBufferSize: ReadBufferSize,
 		WriteBufferSize: WriteBufferSize,

@@ -28,11 +28,8 @@ func main() {
 	})
 	server.Listen("click", func(client *socket.Client, data interface{}) {
 		fmt.Println("event callback", data)
-		fmt.Println(client.Get("peter"))
 	})
 	http.ListenAndServe("localhost:8080", nil)
-
-
 
 	/*server.AddDisconnectListener(func(client *socket.Client) {
 		fmt.Println("disconnected")

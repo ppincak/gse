@@ -55,8 +55,7 @@ func (client *Client) readPump() {
 		if err != nil {
 			if websocket.IsCloseError(err) ||
 			   websocket.IsUnexpectedCloseError(err) {
-				logrus.Errorln("Client disconnected", err)
-				client.Disconnect()
+				client.disconnectError(err)
 				return
 			}
 		}
@@ -81,7 +80,7 @@ func (client *Client) writePump() {
 		select {
 			case msg := <-client.wc:
 				if err := client.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
-					client.Disconnect()
+					client.disconnectError(err)
 					return
 				}
 		}
@@ -92,6 +91,11 @@ func (client *Client) Disconnect() {
 	client.leaveAllRooms()
 	client.server.removeClient(client)
 	client.ws.Close()
+}
+
+func (client *Client) disconnectError(err error) {
+	logrus.Error(err)
+	client.Disconnect()
 }
 
 func (client *Client) GetSessionId() string {
@@ -143,15 +147,11 @@ func (client *Client) leaveAllRooms() {
 	client.mtx.Unlock()
 }
 
-func (client *Client) connectionError() {
-	logrus.Error()
-}
-
 // send message to client connection
 func (client *Client) sendMessage(tmsg *transportmessage) {
 	raw, err := json.Marshal(tmsg)
 	if err != nil {
-		// log error
+		logrus.Debug(Errors[FailedToParseMessage], err)
 	}
 	client.wc <- raw
 }
@@ -163,7 +163,7 @@ func (client *Client) SendEvent(event string, data interface{}) {
 	}
 	raw, err := json.Marshal(tmsg)
 	if err != nil {
-		// log error
+		logrus.Debug(Errors[FailedToParseMessage], err)
 	}
 	client.wc <- raw
 }

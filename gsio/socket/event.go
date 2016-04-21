@@ -1,10 +1,8 @@
 package socket
 
-// Callbacks
+// Event callbacks
 type EventCallback func(*Client, interface{})
-
 type ConnectCallback func(*Client)
-
 type DisconnectCallback func(*Client)
 
 type Listenable interface {

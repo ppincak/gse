@@ -42,14 +42,14 @@ type Server struct {
 	// data mutex
 	mtx        		*sync.RWMutex
 	// server configuration
-	conf       		*Conf
+	conf       		*ServerConf
 	//
 	storeF     		socket.LocalStoreFactory
 	// server stats
 	stats      		*Stats
 }
 
-func NewServer(storeFactory socket.LocalStoreFactory, config *Conf) *Server {
+func NewServer(storeFactory socket.LocalStoreFactory, config *ServerConf) *Server {
 	if storeFactory == nil {
 		storeFactory = socket.NewLocalStore
 	}
@@ -81,9 +81,12 @@ func NewServer(storeFactory socket.LocalStoreFactory, config *Conf) *Server {
 }
 
 func (server *Server) Run() {
+	logrus.Info("Starting socket server worker")
+
 	for {
 		select {
 			case msg := <- server.liregc:
+				logrus.Infof("Registering event: %+v", msg)
 				switch msg.listenerType {
 					case Connect:
 						server.cListeners = append(server.cListeners, msg.ConnectCallback)
@@ -119,12 +122,14 @@ func (server *Server) Run() {
 					client.sendMessage(msg)
 				}
 			case <- server.stopc:
+				logrus.Info("Socket server worker stopped")
 				return
 		}
 	}
 }
 
 func (server *Server) Stop() {
+	logrus.Info("Stopping socket server worker")
 	server.stopc <- struct{}{}
 }
 
