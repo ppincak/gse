@@ -94,8 +94,9 @@ func (client *Client) Disconnect() {
 }
 
 func (client *Client) disconnectError(err error) {
-	logrus.Error(err)
 	client.Disconnect()
+	logrus.Error(err)
+	client.server.stats.Inc(FailedConnections)
 }
 
 func (client *Client) GetSessionId() string {
@@ -103,7 +104,7 @@ func (client *Client) GetSessionId() string {
 }
 
 func (client *Client) JoinRoom(roomName string) error {
-	room, err := client.server.getRoom(roomName)
+	room, err := client.server.GetRoom(roomName)
     if err != nil {
 		return err
 	}

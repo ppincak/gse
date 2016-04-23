@@ -26,27 +26,27 @@ type Server struct {
 	// map of all connected clients
 	clients    		map[string]*Client
 	// event listeners
-	listeners  		map[string] []EventCallback
+	listeners    	map[string] []EventCallback
 	//  connection callbacks
-	cListeners 		[]ConnectCallback
+	cListeners   	[]ConnectCallback
 	// disconecct listeners
-	dListeners 		[]DisconnectCallback
+	dListeners   	[]DisconnectCallback
 	// transport channel
-	trpc       		chan *transportmessage
+	trpc         	chan *transportmessage
 	// events channel
-	evc        		chan *Event
+	evc          	chan *Event
 	// event listeners registration channel
-	liregc     		chan registerListener
+	liregc       	chan registerListener
 	// channel for server stopping
-	stopc      		chan struct{}
+	stopc        	chan struct{}
 	// data mutex
-	mtx        		*sync.RWMutex
+	mtx          	*sync.RWMutex
 	// server configuration
-	conf       		*ServerConf
-	//
-	storeF     		socket.LocalStoreFactory
+	conf         	*ServerConf
+	//  store factory
+	storeFactory 	socket.LocalStoreFactory
 	// server stats
-	stats      		*Stats
+	stats        	*Stats
 }
 
 func NewServer(storeFactory socket.LocalStoreFactory, config *ServerConf) *Server {
@@ -75,7 +75,7 @@ func NewServer(storeFactory socket.LocalStoreFactory, config *ServerConf) *Serve
 		stopc: 			make(chan struct{}),
 		mtx: 			new(sync.RWMutex),
 		stats: 			NewStats(),
-		storeF: 		storeFactory,
+		storeFactory: 		storeFactory,
 		conf: 			config,
 	}
 }
@@ -118,6 +118,7 @@ func (server *Server) Run() {
 						}
 				}
 			case msg := <- server.trpc:
+				logrus.Info("Sending message to all clients")
 				for _, client := range server.clients {
 					client.sendMessage(msg)
 				}
@@ -199,7 +200,7 @@ func (server *Server) AddRoom(roomName string) string {
 	return room.uuid
 }
 
-func (server *Server) getRoom(roomName string) (*Room, error) {
+func (server *Server) GetRoom(roomName string) (*Room, error) {
 	server.mtx.RLock()
 	for _, room := range server.rooms {
 		if room.Name == roomName {
@@ -268,7 +269,7 @@ func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		logrus.Error(err)
 		return
 	}
-	client := NewClient(server, ws, server.storeF())
+	client := NewClient(server, ws, server.storeFactory())
 	go client.readPump()
 	go client.writePump()
 	server.addClient(client)
