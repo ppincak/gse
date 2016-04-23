@@ -10,6 +10,7 @@ const(
 
 type ServerConf struct {
 	ServerName  		string	`json:"serverName"`
+	EventBuffer         int     `json:"eventBuffer"`
 	ReadBufferSize 		int 	`json:"readBufferSize"`
 	WriteBufferSize		int 	`json:"writeBufferSize"`
 	MaxNumOfClients 	int32 	`json:"numberOfClients"`

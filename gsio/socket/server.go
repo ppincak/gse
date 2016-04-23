@@ -6,37 +6,22 @@ import (
 	"github.com/sirupsen/logrus"
 	"sync"
 	"errors"
-	"fmt"
-
 	"com.grid/chsen/gsio/store"
 )
 
-type listeners struct {
-	listeners  map[string] []EventCallback
-	//  connection callbacks
-	cListeners []ConnectCallback
-	// disconecct listeners
-	dListeners []DisconnectCallback
-}
-
 type Server struct {
+	// listeners
+	*Listeners
+	// upgrader
 	upgrader   		*websocket.Upgrader
 	// map of all connected rooms
 	rooms      		map[string]*Room
 	// map of all connected clients
 	clients    		map[string]*Client
-	// event listeners
-	listeners    	map[string] []EventCallback
-	//  connection callbacks
-	cListeners   	[]ConnectCallback
-	// disconecct listeners
-	dListeners   	[]DisconnectCallback
 	// transport channel
-	trpc         	chan *transportmessage
+	trpc         	chan *Transportmessage
 	// events channel
 	evc          	chan *Event
-	// event listeners registration channel
-	liregc       	chan registerListener
 	// channel for server stopping
 	stopc        	chan struct{}
 	// data mutex
@@ -63,19 +48,15 @@ func NewServer(storeFactory socket.LocalStoreFactory, config *ServerConf) *Serve
 	}
 
 	return &Server {
+		Listeners: 		newListeners(),
 		upgrader: 		upgrader,
 		rooms: 			make(map[string] *Room),
 		clients: 		make(map[string] *Client),
-		listeners: 		make(map[string] []EventCallback),
-		cListeners:     make([]ConnectCallback, 0),
-		dListeners:     make([]DisconnectCallback, 0),
-		trpc: 			make(chan *transportmessage),
 		evc: 			make(chan *Event),
-		liregc: 		make(chan registerListener),
 		stopc: 			make(chan struct{}),
 		mtx: 			new(sync.RWMutex),
 		stats: 			NewStats(),
-		storeFactory: 		storeFactory,
+		storeFactory: 	storeFactory,
 		conf: 			config,
 	}
 }
@@ -88,32 +69,36 @@ func (server *Server) Run() {
 			case msg := <- server.liregc:
 				logrus.Infof("Registering event: %+v", msg)
 				switch msg.listenerType {
-					case Connect:
-						server.cListeners = append(server.cListeners, msg.ConnectCallback)
-					case Disconnect:
-						server.dListeners = append(server.dListeners, msg.DisconnectCallback)
-					case Custom:
-						if listeners, ok := server.listeners[msg.event]; ok {
-							server.listeners[msg.event] = append(listeners, msg.EventCallback)
+					case connectCall:
+						server.cCallbacks = append(server.cCallbacks, msg.ConnectCallback)
+					case disconnectCall:
+						server.dCallbacks = append(server.dCallbacks, msg.DisconnectCallback)
+					case customCall:
+						if listeners, ok := server.callbacks[msg.event]; ok {
+							server.callbacks[msg.event] = append(listeners, msg.EventCallback)
 						} else {
-							server.listeners[msg.event] = []EventCallback {msg.EventCallback}
+							server.callbacks[msg.event] = []EventCallback {msg.EventCallback}
 						}
 				}
 			case evt := <- server.evc:
 				switch evt.EventType {
-					case Connect:
-						fmt.Println( server.cListeners)
-						for _, callback := range server.cListeners{
-							go callback(evt.Client)
+					case connectCall:
+						server.cChan <- evt.Client
+						for _, callback := range server.cCallbacks{
+							callback(evt.Client)
 						}
-					case Disconnect:
-						for _, callback := range server.dListeners{
-							go callback(evt.Client)
+					case disconnectCall:
+						server.dChan <- evt.Client
+						for _, callback := range server.dCallbacks{
+							callback(evt.Client)
 						}
-					case Custom:
-						if listeners, ok := server.listeners[evt.Name]; ok{
+					case customCall:
+						if c, ok := server.eChans[evt.Name]; ok {
+							c <- evt
+						}
+						if listeners, ok := server.callbacks[evt.Name]; ok{
 							for _, listener := range listeners {
-								go listener(evt.Client, evt.Data)
+								listener(evt.Client, evt.Data)
 							}
 						}
 				}
@@ -134,30 +119,8 @@ func (server *Server) Stop() {
 	server.stopc <- struct{}{}
 }
 
-func (server *Server) AddConnectListener(callback ConnectCallback) {
-	server.liregc <- registerListener{
-		listenerType: Connect,
-		ConnectCallback: callback,
-	}
-}
-
-func (server *Server) AddDisconnectListener(callback DisconnectCallback) {
-	server.liregc <- registerListener{
-		listenerType: Disconnect,
-		DisconnectCallback: callback,
-	}
-}
-
-func (server *Server) Listen(event string, callback EventCallback) {
-	server.liregc <- registerListener{
-		listenerType: Custom,
-		event: event,
-		EventCallback: callback,
-	}
-}
-
 func (server *Server) SendEvent(event string, data interface{}) {
-	server.trpc <- &transportmessage{
+	server.trpc <- &Transportmessage{
 		Event: event,
 		Data: data,
 	}
@@ -247,7 +210,7 @@ func (server *Server) addClient(client *Client) {
 	server.mtx.Unlock()
     server.stats.Inc(OpenedClients)
 	server.evc <- &Event{
-		EventType: Connect,
+		EventType: connectCall,
 		Client: client,
 	}
 }
@@ -258,7 +221,7 @@ func (server *Server) removeClient(client *Client) {
 	server.mtx.Unlock()
 	server.stats.Inc(ClosedClients)
 	server.evc <- &Event{
-		EventType: Disconnect,
+		EventType: disconnectCall,
 		Client: client,
 	}
 }

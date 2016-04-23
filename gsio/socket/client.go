@@ -39,8 +39,8 @@ func NewClient(server  *Server, ws *websocket.Conn, store socket.Store) (*Client
 	};
 }
 
-func(client *Client) processMessage(rawMsg []byte) (*transportmessage, error) {
-	var tmsg transportmessage
+func(client *Client) processMessage(rawMsg []byte) (*Transportmessage, error) {
+	var tmsg Transportmessage
 	err := json.Unmarshal(rawMsg, &tmsg)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (client *Client) readPump() {
 		}
 
 		evt := &Event{
-			EventType: Custom,
+			EventType: customCall,
 			Name: tmsg.Event,
 			Client: client,
 			Data: tmsg.Data,
@@ -149,7 +149,7 @@ func (client *Client) leaveAllRooms() {
 }
 
 // send message to client connection
-func (client *Client) sendMessage(tmsg *transportmessage) {
+func (client *Client) sendMessage(tmsg *Transportmessage) {
 	raw, err := json.Marshal(tmsg)
 	if err != nil {
 		logrus.Debug(Errors[FailedToParseMessage], err)
@@ -158,7 +158,7 @@ func (client *Client) sendMessage(tmsg *transportmessage) {
 }
 
 func (client *Client) SendEvent(event string, data interface{}) {
-	tmsg := &transportmessage{
+	tmsg := &Transportmessage{
 		Event: event,
 		Data: data,
 	}
