@@ -7,40 +7,39 @@ import (
 	"sync"
 	"com.grid/chsen/gsio/store"
 	"github.com/sirupsen/logrus"
-
 )
 
 type Client struct {
 	// uid of the room
-	uuid   string
+	uuid   		string
 	// pointer to server
-	server *Server
+	namespace 	*Namespace
 	// websocket connection
-	ws     *websocket.Conn
+	ws     		*websocket.Conn
 	// storage space
-	store  socket.Store
+	store  		socket.Store
 	// rooms to which the client is connected
-	rooms  map[string]*Room
+	rooms  		map[string]*Room
 	// writer channel
-	wc     chan []byte
+	wc     		chan []byte
 	// write mutex
-	mtx    *sync.RWMutex
+	mtx    		*sync.RWMutex
 }
 
-func NewClient(server  *Server, ws *websocket.Conn, store socket.Store) (*Client) {
+func NewClient(namespace  *Namespace, ws *websocket.Conn, store socket.Store) (*Client) {
 	return &Client{
-		uuid: 	utils.GenerateUID(),
-		server: server,
-		ws: ws,
-		store: store,
-		rooms: 	make(map[string] *Room),
-		wc: make(chan []byte),
-		mtx: new(sync.RWMutex),
+		uuid: 		utils.GenerateUID(),
+		namespace: 	namespace,
+		ws:			ws,
+		store: 		store,
+		rooms: 		make(map[string] *Room),
+		wc: 		make(chan []byte),
+		mtx: 		new(sync.RWMutex),
 	};
 }
 
-func(client *Client) processMessage(rawMsg []byte) (*Transportmessage, error) {
-	var tmsg Transportmessage
+func(client *Client) processMessage(rawMsg []byte) (*TransportMessage, error) {
+	var tmsg TransportMessage
 	err := json.Unmarshal(rawMsg, &tmsg)
 	if err != nil {
 		return nil, err
@@ -65,12 +64,12 @@ func (client *Client) readPump() {
 		}
 
 		evt := &Event{
-			EventType: customCall,
+			EventType: eventListener,
 			Name: tmsg.Event,
 			Client: client,
 			Data: tmsg.Data,
 		}
-		client.server.evc <-evt
+		client.namespace.evc <-evt
 	}
 }
 
@@ -89,14 +88,14 @@ func (client *Client) writePump() {
 
 func (client *Client) Disconnect() {
 	client.leaveAllRooms()
-	client.server.removeClient(client)
+	client.namespace.removeClient(client)
 	client.ws.Close()
 }
 
 func (client *Client) disconnectError(err error) {
 	client.Disconnect()
 	logrus.Error(err)
-	client.server.stats.Inc(FailedConnections)
+	client.namespace.statIncr(FailedConnections)
 }
 
 func (client *Client) GetSessionId() string {
@@ -104,7 +103,7 @@ func (client *Client) GetSessionId() string {
 }
 
 func (client *Client) JoinRoom(roomName string) error {
-	room, err := client.server.GetRoom(roomName)
+	room, err := client.namespace.GetRoom(roomName)
     if err != nil {
 		return err
 	}
@@ -124,7 +123,7 @@ func (client *Client) joinRoom(room *Room) {
 
 func (client *Client) LeaveRoom(roomName string) {
 	for _, room := range client.rooms {
-		if room.Name == roomName {
+		if room.name == roomName {
 			client.leaveRoom(room)
 			return
 		}
@@ -149,7 +148,7 @@ func (client *Client) leaveAllRooms() {
 }
 
 // send message to client connection
-func (client *Client) sendMessage(tmsg *Transportmessage) {
+func (client *Client) sendMessage(tmsg *TransportMessage) {
 	raw, err := json.Marshal(tmsg)
 	if err != nil {
 		logrus.Debug(Errors[FailedToParseMessage], err)
@@ -158,7 +157,7 @@ func (client *Client) sendMessage(tmsg *Transportmessage) {
 }
 
 func (client *Client) SendEvent(event string, data interface{}) {
-	tmsg := &Transportmessage{
+	tmsg := &TransportMessage{
 		Event: event,
 		Data: data,
 	}

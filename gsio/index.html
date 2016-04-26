@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+</head>
+<body>
+    <h3>
+        Hello World
+    </h3>
+
+    <script type="text/javascript">
+        var ws = new WebSocket("ws://localhost:8080/ws");
+        ws.onopen = function(event) {
+            console.log("here");
+            ws.send(JSON.stringify({event: "click", data: "test"}));
+        };
+
+
+    </script>
+</body>
+</html>

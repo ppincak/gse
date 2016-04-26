@@ -1,42 +1,53 @@
 package queue
 
 import (
-	"net"
-	"encoding/json"
-	"strings"
+
+	"golang.org/x/net/context"
+	"com.grid/chsen/gsio/socket"
+	//"fmt"
+	"time"
+	"fmt"
 )
 
 
 type Queue struct {
-	conn 	net.Listener
-	conf	*QueueConf
-	out     chan []byte
+	queuec      chan interface{}
+	stopc		chan struct{}
+	server 		*socket.Server
 }
 
-func NewQueue(conf *QueueConf, out <-chan []byte) (*Queue) {
+func NewQueue() (*Queue) {
 	return &Queue{
-		conf: defaultConfig(),
-		out: out,
 	}
 }
 
-func (queue *Queue) Run() (error) {
-	// todo assemble url
-	conn, err := net.Listen(Protocol, queue.assembleUrl())
-	if err != nil {
-		return err
+type queueMessage struct {
+	context 	context.Context
+	req 		interface{}
+}
+
+func (queue *Queue) Run() {
+	for {
+		select {
+			case msg := <- queue.queuec:
+				switch msg.(type) {
+					case *AddRoomReq:
+						req := msg.(*AddRoomReq)
+						queue.server.AddRoom(req.RoomName)
+				}
+		}
 	}
-
-
-
-    queue.conn = conn
-	return nil
 }
 
 func (queue *Queue) Stop() {
 
 }
 
-func (queue *Queue) assembleUrl() string {
-	return strings.Join([]string{queue.conf.Host, ":", queue.conf.Port}, "")
+func (queue *Queue) AddRoom(ctx context.Context, req *AddRoomReq) (*Response, error) {
+	fmt.Println(time.Now())
+	return new(Response), nil
+}
+
+func (queue *Queue) RemoveRoom(ctx context.Context, req *RemRoomReq) (*Response, error) {
+	return new(Response), nil
 }

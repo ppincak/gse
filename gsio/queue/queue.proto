@@ -1,15 +1,32 @@
-syntax = "proto2";
+syntax = "proto3";
 
 package queue;
 
-service Queue {
+import "gogoproto/gogo.proto";
 
+option (gogoproto.sizer_all) = true;
+
+service QueueService {
+    rpc AddRoom         (AddRoomReq)     returns (Response) {}
+    rpc RemoveRoom      (RemRoomReq)     returns (Response) {}
 }
 
-enum MessageType {
-
+enum StatusCode {
+    Ok                  = 0;
+    Error               = 1;
+    ResourceNotFound    = 2;
 }
 
-message Message {
-    required MessageType type = 1 ;
+message AddRoomReq {
+    string roomName         = 1 [(gogoproto.nullable) = false];
+    uint64 roomCapacity     = 2 [(gogoproto.nullable) = false];
+}
+
+message RemRoomReq {
+    string roomName = 1 [(gogoproto.nullable) = false];
+}
+
+message Response {
+    StatusCode statusCode  = 1 [(gogoproto.nullable) = false];
+    string     status      = 2 [(gogoproto.nullable) = false];
 }

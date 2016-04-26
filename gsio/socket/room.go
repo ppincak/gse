@@ -6,24 +6,33 @@ import (
 )
 
 type Room struct {
-	uuid    string
-	// server reference
-	server  *Server
+	uuid    	string
 	// name of the room
-	Name    string
+	name    	string
+	// namespace reference
+	namespace	*Namespace
 	// all the clients in the room
-	clients map[string]*Client
-	mtx     *sync.RWMutex
+	clients 	map[string]*Client
+
+	mtx     	*sync.RWMutex
 }
 
-func NewRoom(server *Server, name string) *Room {
+func NewRoom(namespace *Namespace, name string) *Room {
 	return &Room{
 		uuid: 		utils.GenerateUID(),
-		server: 	server,
-		Name: 		name,
+		name: 		name,
+		namespace: 	namespace,
 		clients: 	make(map[string]*Client),
 		mtx: 		new(sync.RWMutex),
 	}
+}
+
+func (room *Room) GetSessionId() string {
+	return room.uuid
+}
+
+func (room *Room) GetName() string {
+	return room.name
 }
 
 func (room *Room) addClient(client *Client) {

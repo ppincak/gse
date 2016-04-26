@@ -1,117 +1,107 @@
 package socket
 
-// Different callback types
-type EventCallback func(*Client, interface{})
-type RoomCreatedCallback func(room *Room)
-type ConnectCallback func(*Client)
-type DisconnectCallback func(*Client)
+type EventListener func(*Client, interface{})
+type RoomAddListener func(room *Room)
+type RoomRemListener func(room *Room)
+type ConnectListener func(*Client)
+type DisconnectListener func(*Client)
 
 type Listenable interface {
-	// Listen to event
-	ListenCallback(string, EventCallback)
-	// Listen to event
 	Listen(string, chan<- *Event)
 }
 
 type registerListener struct {
 	listenerType 		EventType
 	event        		string
-	eventc       		chan<- *Event
-	clientc      		chan<- *Client
-	ConnectCallback
-	DisconnectCallback
-	EventCallback
+	EventListener
+	RoomAddListener
+	RoomRemListener
+	ConnectListener
+	DisconnectListener
 }
 
 type EventType int
 
 const(
-	connectCall EventType = iota
-	connectChan
-	disconnectCall
-	disconnectChan
-	customCall
-	customChan
+	connectListener EventType = iota
+	disconnectListener
+	roomAddListener
+	roomRemListener
+	eventListener
 )
 
 type Event struct {
 	// type of the event
-	EventType EventType
+	EventType 	EventType
 	// Name of the event
-	Name      string
+	Name      	string
 	// Client receiving event
-	Client    *Client
+	Client    	*Client
+	// Room
+	Room		*Room
 	// event data
-	Data      interface{}
+	Data      	interface{}
 }
 
 type Listeners struct {
 	// registration channel
-	liregc     chan registerListener
-	// event listeners
-	callbacks  map[string] []EventCallback
-	//  connection callbacks
-	cCallbacks []ConnectCallback
-	// disconnect listeners
-	dCallbacks []DisconnectCallback
-	// channel event listeners
-	eChans     map[string] chan *Event
+	liregc 			chan registerListener
 	// connect event channel
-	cChan      chan *Client
+	clientCon		[]ConnectListener
 	// disconnect event channel
-	dChan      chan *Client
+	clientDis 		[]DisconnectListener
+	// event listeners
+	events 			map[string] []EventListener
+	// room created channels
+	roomAdd			[]RoomAddListener
+	// room
+	roomRem			[]RoomRemListener
+
 }
 
 func newListeners() *Listeners {
 	return &Listeners{
-		liregc:       	make(chan registerListener),
-		callbacks:		make(map[string] []EventCallback),
-		cCallbacks: 	make([]ConnectCallback, 0),
-		dCallbacks: 	make([]DisconnectCallback, 0),
-		eChans: 		make(map[string] chan *Event),
+		liregc:     make(chan registerListener),
+		clientCon:  make([]ConnectListener, 0),
+		clientDis:	make([]DisconnectListener, 0),
+		events: 	make(map[string] []EventListener),
+		roomAdd:    make([]RoomAddListener, 0),
+		roomRem:    make([]RoomRemListener, 0),
 	}
 }
 
-func (lst *Listeners) AddConnectCallback(callback ConnectCallback) {
+func (lst *Listeners) AddConnectListener(listener ConnectListener) {
 	lst.liregc <- registerListener{
-		listenerType: connectCall,
-		ConnectCallback: callback,
+		listenerType: connectListener,
+		ConnectListener: listener,
 	}
 }
 
-func (lst *Listeners) AddDisconnectCallback(callback DisconnectCallback) {
+func (lst *Listeners) AddDisconnectListener(listener DisconnectListener) {
 	lst.liregc <- registerListener{
-		listenerType: disconnectCall,
-		DisconnectCallback: callback,
+		listenerType: disconnectListener,
+		DisconnectListener: listener,
 	}
 }
 
-func (lst *Listeners) ListenCallback(event string, callback EventCallback) {
+func (lst *Listeners) AddRoomAddListener(listener RoomAddListener) {
 	lst.liregc <- registerListener{
-		listenerType: customCall,
+		listenerType: roomAddListener,
+		RoomAddListener: listener,
+	}
+}
+
+func (lst *Listeners) AddRoomRemoveListener(listener RoomRemListener) {
+	lst.liregc <- registerListener{
+		listenerType: roomRemListener,
+		RoomRemListener: listener,
+	}
+}
+
+func (lst *Listeners) Listen(event string, listener EventListener) {
+	lst.liregc <- registerListener{
+		listenerType: eventListener,
 		event: event,
-		EventCallback: callback,
-	}
-}
-
-func (lst *Listeners) SetConnectChan(clientc chan<- *Client) {
-	lst.liregc <- registerListener{
-		listenerType: connectChan,
-		clientc: clientc,
-	}
-}
-
-func (lst *Listeners) SetDisconnectChan(clientc chan<- *Client) {
-	lst.liregc <- registerListener{
-		listenerType: disconnectChan,
-		clientc: clientc,
-	}
-}
-
-func (lst *Listeners) Listen(event string, eventc chan<- *Event) {
-	lst.liregc <- registerListener{
-		listenerType: customChan,
-		event: event,
-		eventc: eventc,
+		EventListener: listener,
 	}
 }

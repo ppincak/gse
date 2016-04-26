@@ -3,13 +3,15 @@ package socket
 import "encoding/json"
 
 var Errors = map[int]string{
-	RoomDoesNotExist: "Room doesnt exist",
-	FailedToParseMessage: "Failed to parse message",
+	RoomDoesNotExist: 		"Room doesnt exist",
+	ServerAlreadyRunning:	"Server is already running",
+	FailedToParseMessage: 	"Failed to parse message",
 }
 
 const (
 	RoomDoesNotExist = iota
 	FailedToParseMessage
+	ServerAlreadyRunning
 )
 
 type Error struct {
