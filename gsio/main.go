@@ -23,7 +23,7 @@ func main() {
  	server := socket.NewServer(nil, nil)
 	n, _ := server.AddNamespace("/comments")
 	n.AddConnectListener(func(client * socket.SocketClient) {
-
+		fmt.Println("connected")
 	})
 	n.Listen("click", func(client * socket.SocketClient, data []interface{}) {
 

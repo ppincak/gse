@@ -13,7 +13,6 @@ func NewMonitor() *Monitor {
 }
 
 /**
-
 func (server *Server) getStatus() (Status) {
 	server.mtx.RLock()
 	defer server.mtx.RUnlock()
@@ -41,6 +40,4 @@ func (server *Server) getStatus() (Status) {
 func (server *Server) getStats() (monitor.Stats) {
 	return *server.stats
 }
-
-
 */

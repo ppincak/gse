@@ -75,7 +75,7 @@ func (room *Room) DestroyRoom() {
 	room.mtx.Unlock()
 }
 
-func (room *Room) SendEvent(event string, data interface{}) {
+func (room *Room) SendEvent(event string, data []interface{}) {
 	for _, client := range room.clients {
 		client.SendEvent(event, data)
 	}

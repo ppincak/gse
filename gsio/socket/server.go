@@ -100,6 +100,7 @@ func (server *Server) removeNamespaceClient(client *Client, namespaceName string
 }
 
 func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
+
 	ws, err := server.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logrus.Error(err)
@@ -111,4 +112,5 @@ func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	go client.readPump()
 	go client.writePump()
+	client.sendPacketEvent("")
 }

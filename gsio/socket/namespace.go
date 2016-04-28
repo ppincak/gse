@@ -9,11 +9,11 @@ import (
 type Namespace struct {
 	name      	string
 	// reference to server
-	server    	*Server
+	server		*Server
 	// rooms in the namespace
-	rooms     	map[string]*Room
+	rooms		map[string]*Room
 	// clients in the namespace
-	clients   	map[string]*Client
+	clients		map[string]*Client
 	// listeners
 	*Listeners
 	// events 		channel

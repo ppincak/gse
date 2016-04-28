@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"com.grid/chsen/gsio/socket/transport"
 	"errors"
+	"fmt"
 )
 
 
@@ -59,6 +60,8 @@ func (client *Client) onPacket(bytes []byte) {
 		logrus.Error(err)
 		return
 	}
+
+	fmt.Println(packet)
 
 	switch packet.PacketType {
 		case transport.Connect:
@@ -126,11 +129,14 @@ func (client *Client) onAck(packet *transport.Packet) {
 func (client *Client) readPump() {
 	for {
 		_, msg, err := client.ws.ReadMessage()
+
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err) {
+				logrus.Error("Disconnect during read:")
 				client.disconnectError(err)
 				return
 			}
+			logrus.Error(err)
 		}
 		client.onPacket(msg)
 	}
@@ -141,9 +147,14 @@ func (client *Client) writePump() {
 	for {
 		select {
 			case msg := <-client.wc:
+				fmt.Println("write", msg)
 				if err := client.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
-					client.disconnectError(err)
-					return
+					if websocket.IsUnexpectedCloseError(err) {
+						logrus.Error("Disconnect during write")
+						client.disconnectError(err)
+						return
+					}
+					logrus.Error(err)
 				}
 		}
 	}
@@ -238,22 +249,35 @@ func (client *Client) disconnectFromNamespaces() {
 }
 
 // send message to client connection
-func (client *Client) sendMessage(tmsg *TransportMessage) {
-	raw, err := json.Marshal(tmsg)
+func (client *Client) sendMessage(packet *transport.Packet) {
+	raw, err := json.Marshal(packet)
 	if err != nil {
-		logrus.Debug(Errors[FailedToParseMessage], err)
+		logrus.Debug(Errors[FailedToParsePacket], err)
 	}
 	client.wc <- raw
 }
 
-func (client *Client) SendEvent(event string, data interface{}) {
-	tmsg := &TransportMessage{
-		Event: event,
-		Data: data,
+func (client *Client) sendPacketEvent(event string) {
+	packet := &transport.Packet{
+		PacketType: transport.Connect,
+		Endpoint: "/",
 	}
-	raw, err := json.Marshal(tmsg)
+	raw, err := json.Marshal(packet)
 	if err != nil {
-		logrus.Debug(Errors[FailedToParseMessage], err)
+		logrus.Debug(Errors[FailedToParsePacket], err)
+	}
+	client.wc <- raw
+}
+
+func (client *Client) SendEvent(event string, data []interface{}) {
+	packet := &transport.Packet{
+		Name: event,
+		Data: data,
+		PacketType: transport.Connect,
+	}
+	raw, err := json.Marshal(packet)
+	if err != nil {
+		logrus.Debug(Errors[FailedToParsePacket], err)
 	}
 	client.wc <- raw
 }

@@ -14,7 +14,15 @@ const(
 	BinaryAck
 )
 
-var EventMap = map[string] PacketType {
+const(
+	Open 	PacketType = iota
+	Close
+	Ping
+	Pong
+	Message
+)
+
+var PacketTypeMap = map[string] PacketType {
 	"connect": 		Connect,
 	"disconnect": 	Disconnect,
 	"event": 		Event,

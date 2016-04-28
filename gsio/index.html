@@ -7266,12 +7266,21 @@
     </script>
 
     <script type="text/javascript">
-       /* var ws = new WebSocket("ws://localhost:8080/socket.io/");
+      /*  var ws = new WebSocket("ws://localhost:8080/socket.io/");
         ws.onopen = function(event) {
             console.log("here");
             ws.send(JSON.stringify({type: 2, name: "click", endpoint: "/comments", data: ["test"]}));
+
+            ws.onmessage = function(obj) {
+                console.log("message", obj);
+            };
         };*/
-       var socket = io('http://localhost:8080/comments', {transports: ['websocket']});
+        var socket = io('http://localhost:8080/', {transports: ['websocket']});
+        socket.on("connect", function() {
+             console.log("connect");
+             socket.emit("click", { name: "data"});
+        });
+       //io('http://localhost:8080/comments', {transports: ['websocket']});
     </script>
 </body>
 </html>

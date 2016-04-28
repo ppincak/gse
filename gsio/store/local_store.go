@@ -5,13 +5,13 @@ import (
 )
 
 type LocalStore struct {
-	data	map[string]interface{}
+	data	map[string] interface{}
 	mtx     *sync.RWMutex
 }
 
 func NewLocalStore() Store {
 	return &LocalStore{
-		data: 	make(map[string]interface{}),
+		data: 	make(map[string] interface{}),
 		mtx: 	new(sync.RWMutex),
 	}
 }
