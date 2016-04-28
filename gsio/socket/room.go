@@ -6,14 +6,14 @@ import (
 )
 
 type Room struct {
-	uuid    	string
+	uuid   		string
 	// name of the room
-	name    	string
+	name	   	string
 	// namespace reference
 	namespace	*Namespace
 	// all the clients in the room
 	clients 	map[string]*Client
-
+	// room lock
 	mtx     	*sync.RWMutex
 }
 

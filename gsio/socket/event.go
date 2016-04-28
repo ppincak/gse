@@ -1,18 +1,18 @@
 package socket
 
-type EventListener func(*Client, interface{})
+type EventListener func(*SocketClient, []interface{})
 type RoomAddListener func(room *Room)
 type RoomRemListener func(room *Room)
-type ConnectListener func(*Client)
-type DisconnectListener func(*Client)
+type ConnectListener func(*SocketClient)
+type DisconnectListener func(*SocketClient)
 
 type Listenable interface {
-	Listen(string, chan<- *Event)
+	Listen(string, chan<- *listenerEvent)
 }
 
 type registerListener struct {
-	listenerType 		EventType
-	event        		string
+	listenerType listenerType
+	event        string
 	EventListener
 	RoomAddListener
 	RoomRemListener
@@ -20,27 +20,27 @@ type registerListener struct {
 	DisconnectListener
 }
 
-type EventType int
+type listenerType int
 
 const(
-	connectListener EventType = iota
+	connectListener listenerType = iota
 	disconnectListener
 	roomAddListener
 	roomRemListener
 	eventListener
 )
 
-type Event struct {
+type listenerEvent struct {
 	// type of the event
-	EventType 	EventType
+	ListenerType listenerType
 	// Name of the event
-	Name      	string
+	Name         string
 	// Client receiving event
-	Client    	*Client
+	Client       *Client
 	// Room
-	Room		*Room
+	Room         *Room
 	// event data
-	Data      	interface{}
+	Data         []interface{}
 }
 
 type Listeners struct {

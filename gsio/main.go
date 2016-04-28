@@ -16,44 +16,24 @@ func connect(client *socket.Client) {
 	fmt.Println("connected")
 }
 
-type Broker struct {
-	conc        		chan *socket.Client
-	disc        		chan *socket.Client
-	evtc        		chan *socket.Event
-}
-
 func main() {
 
 	runtime.GOMAXPROCS(4)
 
  	server := socket.NewServer(nil, nil)
-	go server.Run()
+	n, _ := server.AddNamespace("/comments")
+	n.AddConnectListener(func(client * socket.SocketClient) {
+
+	})
+	n.Listen("click", func(client * socket.SocketClient, data []interface{}) {
+
+	})
+
+	server.Run()
 
 	http.HandleFunc("/index", serveIndexHtml)
-	http.HandleFunc("/ws", server.ServeWebSocket)
+	http.HandleFunc("/socket.io/", server.ServeWebSocket)
 
-	broker := &Broker{
-		conc: make(chan *socket.Client),
-		disc: make(chan *socket.Client),
-		evtc: make(chan *socket.Event),
-	}
-
-	go func(broker *Broker) {
-		for {
-			select {
-				case client := <- broker.conc:
-					fmt.Printf("connected %s", client.GetSessionId())
-				case client := <- broker.disc:
-					fmt.Printf("disconnected %s", client.GetSessionId())
-				case evt := <- broker.evtc:
-					fmt.Println(evt.Data)
-			}
-		}
-	}(broker)
-
-	server.AddConnectListener(broker.conc)
-	server.AddDisconnectListener(broker.disc)
-	server.Listen("click", broker.evtc)
 	http.ListenAndServe("localhost:8080", nil)
 
 	/*server.AddDisconnectListener(func(client *socket.Client) {

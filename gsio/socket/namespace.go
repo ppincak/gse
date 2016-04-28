@@ -7,25 +7,25 @@ import (
 )
 
 type Namespace struct {
-	name			string
+	name      	string
 	// reference to server
-	server			*Server
+	server    	*Server
 	// rooms in the namespace
-	rooms      		map[string]*Room
+	rooms     	map[string]*Room
 	// clients in the namespace
-	clients    		map[string]*Client
-	//
-	listeners 		*Listeners
+	clients   	map[string]*Client
+	// listeners
+	*Listeners
 	// events 		channel
-	evc          	chan *Event
+	evc       	chan *listenerEvent
 	//
-	stopc			chan struct{}
+	stopc     	chan struct{}
 	//
-	mtx				*sync.RWMutex
+	mtx       	*sync.RWMutex
 }
 
 func rootNamespace(server *Server) *Namespace {
-	return newNamespace("/", nil)
+	return newNamespace("/", server)
 }
 
 func newNamespace(name string, server *Server) *Namespace {
@@ -34,32 +34,35 @@ func newNamespace(name string, server *Server) *Namespace {
 		server: 	server,
 		rooms: 		make(map[string]*Room),
 		clients:	make(map[string]*Client),
-		evc: 		make(chan *Event, server.conf.EventBufferSize),
+		Listeners:	newListeners(),
+		evc: 		make(chan *listenerEvent, server.conf.EventBufferSize),
+		stopc: 		make(chan struct{}),
+		mtx:        new(sync.RWMutex),
 	}
 }
 
 func (namespace *Namespace)  Run() {
-	logrus.Info("Running namespace routine")
+	logrus.Infof("Running namespace: %s routine", namespace.name)
 
-	l := namespace.listeners
+	l := namespace.Listeners
 	for {
 		select {
 			case msg := <- l.liregc:
 				switch msg.listenerType {
 					case connectListener:
-						logrus.Infof("Registering connect listener")
+						logrus.Infof("Namespace: %s - registering connect listener", namespace.name)
 						l.clientCon = append(l.clientCon, msg.ConnectListener)
 					case disconnectListener:
-						logrus.Infof("Registering disconnect listener")
+						logrus.Infof("Namespace: %s - registering disconnect listener", namespace.name)
 						l.clientDis = append(l.clientDis, msg.DisconnectListener)
 					case roomAddListener:
-						logrus.Infof("Adding listener to room creation")
+						logrus.Infof("Namespace: %s - adding listener to room creation", namespace.name)
 						l.roomAdd = append(l.roomAdd, msg.RoomAddListener)
 					case roomRemListener:
-						logrus.Infof("Removing listener to room creation")
+						logrus.Infof("Namespace: %s - removing listener to room creation", namespace.name)
 						l.roomRem = append(l.roomRem, msg.RoomRemListener)
 					case eventListener:
-						logrus.Infof("Registering listener for event: %s", msg.event)
+						logrus.Infof("Namespace: %s - registering listener for event: %s", namespace.name,  msg.event)
 						if listeners, ok := l.events[msg.event]; ok {
 							l.events[msg.event] = append(listeners, msg.EventListener)
 						} else {
@@ -67,14 +70,14 @@ func (namespace *Namespace)  Run() {
 						}
 				}
 		case evt := <- namespace.evc:
-			switch evt.EventType {
+			switch evt.ListenerType {
 				case connectListener:
 					for _, listener := range l.clientCon {
-						listener(evt.Client)
+						listener(evt.Client.wrap(namespace))
 					}
 				case disconnectListener:
 					for _, listener := range l.clientDis {
-						listener(evt.Client)
+						listener(evt.Client.wrap(namespace))
 					}
 				case roomAddListener:
 					for _, listener := range l.roomAdd {
@@ -87,19 +90,19 @@ func (namespace *Namespace)  Run() {
 				case eventListener:
 					if listeners, ok := l.events[evt.Name]; ok {
 						for _, listener := range listeners {
-							listener(evt.Client, evt.Data)
+							listener(evt.Client.wrap(namespace), evt.Data)
 						}
 					}
 				}
 			case <- namespace.stopc:
-				logrus.Info("Namespace routine stopped")
+				logrus.Infof("Stopping namespace: %s routine", namespace.name)
 				return
 		}
 	}
 }
 
 func (namespace *Namespace) Stop() {
-	logrus.Info("Stopping socket server worker")
+	logrus.Infof("Stopped namespace: %s routine", namespace.name)
 	namespace.stopc <- struct{}{}
 }
 
@@ -107,14 +110,17 @@ func (namespace *Namespace) GetName() string {
 	return namespace.name
 }
 
+func (Namespace *Namespace) sendListenerEvent() {
+
+}
+
 func (namespace *Namespace) AddRoom(roomName string) string {
 	namespace.mtx.Lock()
 	room := NewRoom(namespace, roomName)
 	namespace.rooms[room.uuid] = room
 	namespace.mtx.Unlock()
-	namespace.statIncr(OpenedRooms)
-	namespace.evc <- &Event{
-		EventType: roomAddListener,
+	namespace.evc <- &listenerEvent{
+		ListenerType: roomAddListener,
 		Room: room,
 	}
 	return room.uuid
@@ -138,9 +144,8 @@ func (namespace *Namespace) RemoveRoom(roomName string) {
 		if room.name == roomName {
 			room.DestroyRoom()
 			delete(namespace.rooms, roomName)
-			namespace.statIncr(ClosedRooms)
-			namespace.evc <- &Event{
-				EventType: roomRemListener,
+			namespace.evc <- &listenerEvent{
+				ListenerType: roomRemListener,
 				Room: room,
 			}
 			return
@@ -161,16 +166,17 @@ func (namespace *Namespace) joinRoom(roomName string, client *Client) {
 }
 
 func (namespace *Namespace) GetClient(sessiondId string) *Client {
-	return nil
+	namespace.mtx.RUnlock()
+	defer namespace.mtx.RUnlock()
+	return namespace.clients[sessiondId]
 }
 
 func (namespace *Namespace) addClient(client *Client) {
 	namespace.mtx.Lock()
 	namespace.clients[client.uuid] = client
 	namespace.mtx.Unlock()
-	namespace.statIncr(OpenedClients)
-	namespace.evc <- &Event{
-		EventType: connectListener,
+	namespace.evc <- &listenerEvent{
+		ListenerType: connectListener,
 		Client: client,
 	}
 }
@@ -179,13 +185,8 @@ func (namespace *Namespace) removeClient(client *Client) {
 	namespace.mtx.Lock()
 	delete(namespace.clients, client.uuid)
 	namespace.mtx.Unlock()
-	namespace.statIncr(ClosedClients)
-	namespace.evc <- &Event{
-		EventType: disconnectListener,
+	namespace.evc <- &listenerEvent{
+		ListenerType: disconnectListener,
 		Client: client,
 	}
-}
-
-func (namespace *Namespace) statIncr(stat int) {
-	namespace.server.stats.Inc(stat)
 }

@@ -6,9 +6,9 @@ type Game struct {
 	server				*socket.Server
 	conc        		chan *socket.Client
 	disc        		chan *socket.Client
-	comc        		chan *socket.Event
-	movec				chan *socket.Event
-	joinc				chan *socket.Event
+	comc        		chan *socket.listenerEvent
+	movec				chan *socket.listenerEvent
+	joinc				chan *socket.listenerEvent
 
 	matches				map[string] *Match
 	clientMatch 		map[string] string

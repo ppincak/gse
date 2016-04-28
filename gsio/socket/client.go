@@ -7,69 +7,132 @@ import (
 	"sync"
 	"com.grid/chsen/gsio/store"
 	"github.com/sirupsen/logrus"
+	"com.grid/chsen/gsio/socket/transport"
+	"errors"
 )
+
 
 type Client struct {
 	// uid of the room
 	uuid   		string
-	// pointer to server
-	namespace 	*Namespace
-	// websocket connection
-	ws     		*websocket.Conn
-	// storage space
-	store  		socket.Store
+	// namespaces to which the client is connected
+	namespaces 	map[string] *Namespace
 	// rooms to which the client is connected
 	rooms  		map[string]*Room
+	// storage space
+	store		socket.Store
+	// webSocket connection
+	ws     		*websocket.Conn
 	// writer channel
 	wc     		chan []byte
 	// write mutex
 	mtx    		*sync.RWMutex
 }
 
-func NewClient(namespace  *Namespace, ws *websocket.Conn, store socket.Store) (*Client) {
+type SocketClient struct {
+	*Client
+	namespace *Namespace
+}
+
+func NewClient(ws *websocket.Conn, store socket.Store) (*Client) {
 	return &Client{
 		uuid: 		utils.GenerateUID(),
-		namespace: 	namespace,
-		ws:			ws,
-		store: 		store,
+		namespaces: make(map[string]*Namespace),
 		rooms: 		make(map[string] *Room),
+		store: 		store,
+		ws:			ws,
 		wc: 		make(chan []byte),
 		mtx: 		new(sync.RWMutex),
 	};
 }
 
-func(client *Client) processMessage(rawMsg []byte) (*TransportMessage, error) {
-	var tmsg TransportMessage
-	err := json.Unmarshal(rawMsg, &tmsg)
-	if err != nil {
-		return nil, err
+func (client *Client) wrap(Namespace *Namespace) *SocketClient {
+	return &SocketClient{
+		Client:  	client,
+		namespace: 	Namespace,
 	}
-	return &tmsg, nil
 }
 
+func (client *Client) onPacket(bytes []byte) {
+	packet, err := transport.Decode(bytes)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+
+	switch packet.PacketType {
+		case transport.Connect:
+			err = client.onConnect(packet)
+		case transport.Disconnect:
+			err = client.onDisconnect(packet)
+		case transport.Event:
+			err = client.onEvent(packet)
+		case transport.Ack:
+			client.onAck(packet)
+		case transport.BinaryAck:
+			// TODO implement
+		case transport.BinaryEvent:
+			// TODO implement
+	}
+
+	if err != nil {
+		logrus.Error(err)
+	}
+}
+
+func (client *Client) on(packet *transport.Packet) (*Namespace, error) {
+	if packet.Endpoint == "" {
+		return nil, errors.New("Packet missing namespace")
+	}
+	namespace, ok := client.namespaces[packet.Endpoint]
+	if !ok {
+		return nil, errors.New("Namespace doesn't exist")
+	}
+	return namespace, nil
+}
+
+func (client *Client) onConnect(packet *transport.Packet) error {
+	namespace, err := client.on(packet)
+	if err == nil {
+		namespace.addClient(client)
+	}
+	return err
+}
+
+func (client *Client) onDisconnect(packet *transport.Packet) error {
+	namespace, err := client.on(packet)
+	if err == nil {
+		namespace.removeClient(client)
+	}
+	return err
+}
+
+func (client *Client) onEvent(packet *transport.Packet) error {
+	namespace, err := client.on(packet)
+	if err == nil {
+		namespace.evc <- &listenerEvent{
+			Name:		 	packet.Name,
+			Data: 			packet.Args,
+			ListenerType: 	eventListener,
+		}
+	}
+	return err
+}
+
+func (client *Client) onAck(packet *transport.Packet) {
+
+}
 // Pump for reading
 func (client *Client) readPump() {
 	for {
 		_, msg, err := client.ws.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err) ||
-			   websocket.IsUnexpectedCloseError(err) {
+			if websocket.IsUnexpectedCloseError(err) {
 				client.disconnectError(err)
 				return
 			}
 		}
-		tmsg, err := client.processMessage(msg)
-		if err != nil {
-			continue
-		}
-
-		evt := &Event{
-			EventType: eventListener,
-			Name: tmsg.Event,
-			Client: client,
-			Data: tmsg.Data,
-		}
-		client.namespace.evc <-evt
+		client.onPacket(msg)
 	}
 }
 
@@ -86,31 +149,49 @@ func (client *Client) writePump() {
 	}
 }
 
+func (client *Client) destroy() {
+	// leave all rooms
+	for _, room := range client.rooms {
+		room.removeClient(client)
+	}
+	// remove from namespaces
+	for _, namespace := range client.namespaces {
+		namespace.removeClient(client)
+	}
+
+	client.namespaces = make(map[string]*Namespace);
+	client.rooms = make(map[string]*Room)
+}
+
 func (client *Client) Disconnect() {
-	client.leaveAllRooms()
-	client.namespace.removeClient(client)
 	client.ws.Close()
+	client.destroy()
 }
 
 func (client *Client) disconnectError(err error) {
-	client.Disconnect()
 	logrus.Error(err)
-	client.namespace.statIncr(FailedConnections)
 }
 
 func (client *Client) GetSessionId() string {
 	return client.uuid
 }
 
-func (client *Client) JoinRoom(roomName string) error {
-	room, err := client.namespace.GetRoom(roomName)
+func (client *Client) addNamespace(namespace *Namespace) {
+	client.mtx.Lock()
+	client.namespaces[namespace.name] = namespace
+	client.mtx.Unlock()
+}
+
+func (n *SocketClient) JoinRoom(roomName string) error {
+	room, err := n.namespace.GetRoom(roomName)
     if err != nil {
 		return err
 	}
-	room.addClient(client)
-	client.mtx.Lock()
-	client.rooms[room.uuid] = room
-	client.mtx.Unlock()
+
+	room.addClient(n.Client)
+	n.Client.mtx.Lock()
+	n.Client.rooms[room.uuid] = room
+	n.Client.mtx.Unlock()
 	return nil
 }
 
@@ -147,6 +228,15 @@ func (client *Client) leaveAllRooms() {
 	client.mtx.Unlock()
 }
 
+func (client *Client) disconnectFromNamespaces() {
+	for _, namespace := range client.namespaces {
+		namespace.removeClient(client)
+	}
+	client.mtx.Lock()
+	client.namespaces = make(map[string]*Namespace);
+	client.mtx.Unlock()
+}
+
 // send message to client connection
 func (client *Client) sendMessage(tmsg *TransportMessage) {
 	raw, err := json.Marshal(tmsg)
@@ -171,20 +261,4 @@ func (client *Client) SendEvent(event string, data interface{}) {
 // send message to client connection
 func (client *Client) SendRaw(data []byte) {
 	client.wc <- data
-}
-
-func (client *Client) Set(key string, value interface{}) {
-	client.store.Set(key, value)
-}
-
-func (client *Client) Get(key string) interface{} {
-	return client.store.Get(key)
-}
-
-func (client *Client) Delete(key string) {
-	client.store.Delete(key)
-}
-
-func (client *Client) Has(key string) bool {
-	return client.store.Has(key)
 }
