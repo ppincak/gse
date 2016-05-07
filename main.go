@@ -1,7 +1,7 @@
 package main
 
 import (
-	"com.grid/chsen/gsio/socket"
+	"com.grid/gse/socket"
 	"fmt"
 	"net/http"
 

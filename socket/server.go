@@ -5,8 +5,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"errors"
-	"com.grid/chsen/gsio/store"
-
+	"com.grid/gse/store"
 )
 
 type Server struct {

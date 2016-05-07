@@ -2,12 +2,12 @@ package socket
 
 import (
 	"github.com/gorilla/websocket"
-	"com.grid/chsen/gsio/utils"
+	"com.grid/gse/utils"
 	"encoding/json"
 	"sync"
-	"com.grid/chsen/gsio/store"
+	"com.grid/gse/store"
 	"github.com/sirupsen/logrus"
-	"com.grid/chsen/gsio/socket/transport"
+	"com.grid/gse/socket/transport"
 	"errors"
 	"fmt"
 )

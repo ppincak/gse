@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"com.grid/chsen/gsio/utils"
+	"com.grid/gse/utils"
 	"sync"
 )
 
