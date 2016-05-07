@@ -72,10 +72,6 @@ func (client *Client) onPacket(bytes []byte) {
 			err = client.onEvent(packet)
 		case transport.Ack:
 			client.onAck(packet)
-		case transport.BinaryAck:
-			// TODO implement
-		case transport.BinaryEvent:
-			// TODO implement
 	}
 
 	if err != nil {
@@ -181,6 +177,7 @@ func (client *Client) Disconnect() {
 
 func (client *Client) disconnectError(err error) {
 	logrus.Error(err)
+	logrus.Infof("Client connection closed, sessionid: %s", client.uuid)
 }
 
 func (client *Client) GetSessionId() string {

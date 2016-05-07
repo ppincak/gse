@@ -56,7 +56,6 @@ type Listeners struct {
 	roomAdd			[]RoomAddListener
 	// room
 	roomRem			[]RoomRemListener
-
 }
 
 func newListeners() *Listeners {

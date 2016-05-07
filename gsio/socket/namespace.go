@@ -18,9 +18,9 @@ type Namespace struct {
 	*Listeners
 	// events 		channel
 	evc       	chan *listenerEvent
-	//
+	// stopping channel
 	stopc     	chan struct{}
-	//
+	// lock
 	mtx       	*sync.RWMutex
 }
 
@@ -108,10 +108,6 @@ func (namespace *Namespace) Stop() {
 
 func (namespace *Namespace) GetName() string {
 	return namespace.name
-}
-
-func (Namespace *Namespace) sendListenerEvent() {
-
 }
 
 func (namespace *Namespace) AddRoom(roomName string) string {

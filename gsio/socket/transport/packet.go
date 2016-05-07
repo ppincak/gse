@@ -10,16 +10,6 @@ const(
 	Event
 	Ack
 	Error
-	BinaryEvent
-	BinaryAck
-)
-
-const(
-	Open 	PacketType = iota
-	Close
-	Ping
-	Pong
-	Message
 )
 
 var PacketTypeMap = map[string] PacketType {
@@ -28,8 +18,6 @@ var PacketTypeMap = map[string] PacketType {
 	"event": 		Event,
 	"ack": 			Ack,
 	"error": 		Error,
-	"binaryack": 	BinaryAck,
-	"binaryevent": 	BinaryEvent,
 }
 
 type Packet struct {
