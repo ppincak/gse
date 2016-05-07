@@ -186,3 +186,11 @@ func (namespace *Namespace) removeClient(client *Client) {
 		Client: client,
 	}
 }
+
+func (namespace *Namespace) SendEvent(event string, data interface{}) {
+	namespace.mtx.RLock()
+	for _, client := range namespace.clients {
+		client.SendEvent(event, data)
+	}
+	namespace.mtx.RUnlock()
+}

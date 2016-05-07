@@ -1,4 +1,4 @@
-package transport
+package socket
 
 import "encoding/json"
 
@@ -28,7 +28,7 @@ type Packet struct {
 	//query string
 	Qs				string			`json:"qs"`
 	// data
-	Data            []interface{}	`json:"data"`
+	Data            interface{}		`json:"data"`
 	// id
 	Id 				int64			`json:"id"`
 	// event name

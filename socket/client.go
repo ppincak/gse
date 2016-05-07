@@ -7,9 +7,7 @@ import (
 	"sync"
 	"com.grid/gse/store"
 	"github.com/sirupsen/logrus"
-	"com.grid/gse/socket/transport"
 	"errors"
-	"fmt"
 )
 
 
@@ -60,8 +58,6 @@ func (client *Client) onPacket(bytes []byte) {
 		logrus.Error(err)
 		return
 	}
-
-	fmt.Println(packet)
 
 	switch packet.PacketType {
 		case transport.Connect:
@@ -143,7 +139,6 @@ func (client *Client) writePump() {
 	for {
 		select {
 			case msg := <-client.wc:
-				fmt.Println("write", msg)
 				if err := client.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
 					if websocket.IsUnexpectedCloseError(err) {
 						logrus.Error("Disconnect during write")
@@ -266,7 +261,7 @@ func (client *Client) sendPacketEvent(event string) {
 	client.wc <- raw
 }
 
-func (client *Client) SendEvent(event string, data []interface{}) {
+func (client *Client) SendEvent(event string, data interface{}) {
 	packet := &transport.Packet{
 		Name: event,
 		Data: data,

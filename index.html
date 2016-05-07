@@ -11,12 +11,10 @@
 
     <script type="text/javascript">
         var ws = new WebSocket("ws://localhost:8080/socket.io/");
-            ws.onopen = function(event) {
-            console.log("here");
-            ws.send(JSON.stringify({type: 2, name: "click", endpoint: "/comments", data: ["test"]}));
 
+        ws.onopen = function(event) {
             ws.onmessage = function(obj) {
-                console.log("message", obj);
+                console.log("message received2", obj);
             };
         };
     </script>

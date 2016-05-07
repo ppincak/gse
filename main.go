@@ -6,10 +6,11 @@ import (
 	"net/http"
 
 	"runtime"
+	"time"
 )
 
 func serveIndexHtml(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "C:\\Users\\ppincak\\go\\src\\com.grid\\chsen\\gsio\\index.html")
+	http.ServeFile(w, r, "C:\\Users\\ppincak\\go\\src\\com.grid\\gse\\index.html")
 }
 
 func connect(client *socket.Client) {
@@ -30,6 +31,18 @@ func main() {
 	})
 
 	server.Run()
+
+	go func(server *socket.Server) {
+		dur, err := time.ParseDuration("1s")
+		if err != nil {
+			return
+		}
+
+		for {
+			server.SendEvent("click", []string {"hello"})
+			time.Sleep(dur)
+		}
+	}(server)
 
 	http.HandleFunc("/index", serveIndexHtml)
 	http.HandleFunc("/socket.io/", server.ServeWebSocket)

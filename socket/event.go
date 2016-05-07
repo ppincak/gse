@@ -11,8 +11,8 @@ type Listenable interface {
 }
 
 type registerListener struct {
-	listenerType listenerType
-	event        string
+	listenerType 		listenerType
+	event        		string
 	EventListener
 	RoomAddListener
 	RoomRemListener

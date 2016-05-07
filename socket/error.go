@@ -9,7 +9,7 @@ var Errors = map[int]string{
 }
 
 const (
-	RoomDoesNotExist = iota
+	RoomDoesNotExist 		= iota
 	FailedToParsePacket
 	ServerAlreadyRunning
 )
