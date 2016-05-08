@@ -26,7 +26,7 @@ func main() {
 	n.AddConnectListener(func(client * socket.SocketClient) {
 		fmt.Println("connected")
 	})
-	n.Listen("click", func(client * socket.SocketClient, data []interface{}) {
+	n.Listen("click", func(client * socket.SocketClient, data interface{}) {
 
 	})
 
@@ -43,6 +43,18 @@ func main() {
 			time.Sleep(dur)
 		}
 	}(server)
+
+	go func(n *socket.Namespace) {
+		dur, err := time.ParseDuration("1s")
+		if err != nil {
+			return
+		}
+
+		for {
+			n.SendEvent("flick", []string {"some data"})
+			time.Sleep(dur)
+		}
+	}(n)
 
 	http.HandleFunc("/index", serveIndexHtml)
 	http.HandleFunc("/socket.io/", server.ServeWebSocket)

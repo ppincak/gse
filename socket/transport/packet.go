@@ -1,4 +1,4 @@
-package socket
+package transport
 
 import "encoding/json"
 
@@ -22,19 +22,19 @@ var PacketTypeMap = map[string] PacketType {
 
 type Packet struct {
 	// type of packet
-	PacketType		PacketType		`json:"type"`
+	PacketType  PacketType		`json:"type"`
 	// namespace
-	Endpoint		string			`json:"endpoint"`
+	Endpoint 	string			`json:"endpoint"`
 	//query string
-	Qs				string			`json:"qs"`
+	Qs       	string			`json:"qs,omitempty"`
 	// data
-	Data            interface{}		`json:"data"`
+	Data     	interface{}		`json:"data"`
 	// id
-	Id 				int64			`json:"id"`
+	Id       	int64			`json:"id,omitempty"`
 	// event name
-	Name            string			`json:"name"`
+	Name     	string			`json:"name"`
 	// event arguments
-	Args			[]interface{}	`json:"args"`
+	Args     	interface{}		`json:"args,omitempty"`
 }
 
 func Encode(packet *Packet) ([]byte, error) {

@@ -77,6 +77,6 @@ func (room *Room) DestroyRoom() {
 
 func (room *Room) SendEvent(event string, data []interface{}) {
 	for _, client := range room.clients {
-		client.SendEvent(event, data)
+		client.SendEvent(event, data, "")
 	}
 }

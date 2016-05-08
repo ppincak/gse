@@ -9,14 +9,34 @@
         Hello World
     </h3>
 
-    <script type="text/javascript">
-        var ws = new WebSocket("ws://localhost:8080/socket.io/");
+    <script type="text/javascript" src="http://localhost:63342/gse-client/src/gse.js"></script>
 
-        ws.onopen = function(event) {
-            ws.onmessage = function(obj) {
-                console.log("message received2", obj);
-            };
-        };
+    <script type="text/javascript">
+        let con = gse.connect({
+            baseUrl: "ws://localhost:8080/socket.io/"
+        });
+
+        con.onConnect(function(){ console.log("on connect");
+            let comments = gse.connect({
+                baseUrl: "ws://localhost:8080/socket.io/",
+                namespace: "/comments"
+            });
+
+            comments.onConnect(function() {
+
+                comments.listen("flick", function(data) {
+                    console.log("click received", data);
+                });
+            });
+        });
+
+        con.listen("click", function(data) {
+            console.log("click received", data);
+        });
+
+
+
+
     </script>
 </body>
 </html>

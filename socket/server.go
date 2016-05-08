@@ -105,7 +105,7 @@ func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := NewClient(ws, server.storeFactory())
+	client := NewClient(server, ws, server.storeFactory())
 	server.addClient(client)
 	logrus.Infof("Client connection established, sessionId: %s", client.GetSessionId())
 

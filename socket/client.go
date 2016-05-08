@@ -7,13 +7,17 @@ import (
 	"sync"
 	"com.grid/gse/store"
 	"github.com/sirupsen/logrus"
+	"com.grid/gse/socket/transport"
 	"errors"
+
 )
 
 
 type Client struct {
 	// uid of the room
 	uuid   		string
+	// server
+	server		*Server
 	// namespaces to which the client is connected
 	namespaces 	map[string] *Namespace
 	// rooms to which the client is connected
@@ -33,10 +37,11 @@ type SocketClient struct {
 	namespace *Namespace
 }
 
-func NewClient(ws *websocket.Conn, store socket.Store) (*Client) {
+func NewClient(server *Server, ws *websocket.Conn, store socket.Store) (*Client) {
 	return &Client{
 		uuid: 		utils.GenerateUID(),
 		namespaces: make(map[string]*Namespace),
+		server:     server,
 		rooms: 		make(map[string] *Room),
 		store: 		store,
 		ws:			ws,
@@ -87,11 +92,19 @@ func (client *Client) on(packet *transport.Packet) (*Namespace, error) {
 }
 
 func (client *Client) onConnect(packet *transport.Packet) error {
-	namespace, err := client.on(packet)
-	if err == nil {
-		namespace.addClient(client)
+	if packet.Endpoint == "" {
+		return errors.New("Packet missing namespace")
 	}
-	return err
+	_, ok := client.namespaces[packet.Endpoint]
+	if ok {
+		return errors.New("Already connected to namespace")
+	}
+	namespace, ok := client.server.namespaces[packet.Endpoint]
+	if !ok {
+		return errors.New("Namespace doesn't exist")
+	}
+	namespace.addClient(client)
+	return nil
 }
 
 func (client *Client) onDisconnect(packet *transport.Packet) error {
@@ -171,6 +184,7 @@ func (client *Client) Disconnect() {
 }
 
 func (client *Client) disconnectError(err error) {
+	client.destroy()
 	logrus.Error(err)
 	logrus.Infof("Client connection closed, sessionid: %s", client.uuid)
 }
@@ -241,7 +255,7 @@ func (client *Client) disconnectFromNamespaces() {
 }
 
 // send message to client connection
-func (client *Client) sendMessage(packet *transport.Packet) {
+func (client *Client) SendPacket(packet *transport.Packet) {
 	raw, err := json.Marshal(packet)
 	if err != nil {
 		logrus.Debug(Errors[FailedToParsePacket], err)
@@ -249,23 +263,12 @@ func (client *Client) sendMessage(packet *transport.Packet) {
 	client.wc <- raw
 }
 
-func (client *Client) sendPacketEvent(event string) {
-	packet := &transport.Packet{
-		PacketType: transport.Connect,
-		Endpoint: "/",
-	}
-	raw, err := json.Marshal(packet)
-	if err != nil {
-		logrus.Debug(Errors[FailedToParsePacket], err)
-	}
-	client.wc <- raw
-}
-
-func (client *Client) SendEvent(event string, data interface{}) {
+func (client *Client) SendEvent(event string, data interface{}, namespaceName string) {
 	packet := &transport.Packet{
 		Name: event,
 		Data: data,
-		PacketType: transport.Connect,
+		PacketType: transport.Event,
+		Endpoint: namespaceName,
 	}
 	raw, err := json.Marshal(packet)
 	if err != nil {

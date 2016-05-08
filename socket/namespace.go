@@ -4,6 +4,7 @@ import (
 	"sync"
 	"errors"
 	"github.com/sirupsen/logrus"
+	"com.grid/gse/socket/transport"
 )
 
 type Namespace struct {
@@ -167,6 +168,14 @@ func (namespace *Namespace) GetClient(sessiondId string) *Client {
 	return namespace.clients[sessiondId]
 }
 
+func (namespace *Namespace) SendEvent(event string, data interface{}) {
+	namespace.mtx.RLock()
+	for _, client := range namespace.clients {
+		client.SendEvent(event, data, namespace.name)
+	}
+	namespace.mtx.RUnlock()
+}
+
 func (namespace *Namespace) addClient(client *Client) {
 	namespace.mtx.Lock()
 	namespace.clients[client.uuid] = client
@@ -175,6 +184,11 @@ func (namespace *Namespace) addClient(client *Client) {
 		ListenerType: connectListener,
 		Client: client,
 	}
+
+	client.SendPacket(&transport.Packet{
+		PacketType: transport.Connect,
+		Endpoint: namespace.name,
+	})
 }
 
 func (namespace *Namespace) removeClient(client *Client) {
@@ -185,12 +199,9 @@ func (namespace *Namespace) removeClient(client *Client) {
 		ListenerType: disconnectListener,
 		Client: client,
 	}
-}
 
-func (namespace *Namespace) SendEvent(event string, data interface{}) {
-	namespace.mtx.RLock()
-	for _, client := range namespace.clients {
-		client.SendEvent(event, data)
-	}
-	namespace.mtx.RUnlock()
+	client.SendPacket(&transport.Packet{
+		PacketType: transport.Disconnect,
+		Endpoint: namespace.name,
+	})
 }
