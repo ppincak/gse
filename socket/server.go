@@ -1,11 +1,11 @@
 package socket
 
 import (
-	"net/http"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"errors"
 	"com.grid/gse/store"
+	"net/http"
+	"errors"
 )
 
 type Server struct {
@@ -64,7 +64,7 @@ func (server *Server) AddNamespace(namespaceName string) (*Namespace, error) {
 
 func (server *Server) addClient(client *Client) {
 	server.mtx.Lock()
-	server.Namespace.clients[client.uuid] = client
+	server.clients[client.uuid] = client
 	server.mtx.Unlock()
 	client.addNamespace(server.Namespace)
 }

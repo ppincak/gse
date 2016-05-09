@@ -16,23 +16,27 @@
             baseUrl: "ws://localhost:8080/socket.io/"
         });
 
-        con.onConnect(function(){ console.log("on connect");
+        con.onConnect(function(){
+            console.log("on connect");
             let comments = gse.connect({
                 baseUrl: "ws://localhost:8080/socket.io/",
                 namespace: "/comments"
             });
 
             comments.onConnect(function() {
+                console.log("on comments connect");
 
                 comments.listen("flick", function(data) {
                     console.log("click received", data);
                 });
             });
+
+            con.listen("click", function(data) {
+                console.log("click received", data);
+            });
         });
 
-        con.listen("click", function(data) {
-            console.log("click received", data);
-        });
+
 
 
 

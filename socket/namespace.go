@@ -184,11 +184,7 @@ func (namespace *Namespace) addClient(client *Client) {
 		ListenerType: connectListener,
 		Client: client,
 	}
-
-	client.SendPacket(&transport.Packet{
-		PacketType: transport.Connect,
-		Endpoint: namespace.name,
-	})
+	client.notify(transport.Connect, namespace.name)
 }
 
 func (namespace *Namespace) removeClient(client *Client) {
@@ -199,9 +195,5 @@ func (namespace *Namespace) removeClient(client *Client) {
 		ListenerType: disconnectListener,
 		Client: client,
 	}
-
-	client.SendPacket(&transport.Packet{
-		PacketType: transport.Disconnect,
-		Endpoint: namespace.name,
-	})
+	client.notify(transport.Disconnect, namespace.name)
 }

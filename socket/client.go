@@ -1,17 +1,15 @@
 package socket
 
 import (
-	"github.com/gorilla/websocket"
+	"com.grid/gse/store"
 	"com.grid/gse/utils"
+	"com.grid/gse/socket/transport"
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 	"encoding/json"
 	"sync"
-	"com.grid/gse/store"
-	"github.com/sirupsen/logrus"
-	"com.grid/gse/socket/transport"
 	"errors"
-
 )
-
 
 type Client struct {
 	// uid of the room
@@ -28,8 +26,12 @@ type Client struct {
 	ws     		*websocket.Conn
 	// writer channel
 	wc     		chan []byte
+	//
+	stopc		chan struct{}
 	// write mutex
 	mtx    		*sync.RWMutex
+	// flag indicating if the connection is open
+	open   		bool
 }
 
 type SocketClient struct {
@@ -46,7 +48,9 @@ func NewClient(server *Server, ws *websocket.Conn, store socket.Store) (*Client)
 		store: 		store,
 		ws:			ws,
 		wc: 		make(chan []byte),
+		stopc:      make(chan struct{}),
 		mtx: 		new(sync.RWMutex),
+		open:		true,
 	};
 }
 
@@ -104,6 +108,7 @@ func (client *Client) onConnect(packet *transport.Packet) error {
 		return errors.New("Namespace doesn't exist")
 	}
 	namespace.addClient(client)
+	client.addNamespace(namespace)
 	return nil
 }
 
@@ -130,18 +135,19 @@ func (client *Client) onEvent(packet *transport.Packet) error {
 func (client *Client) onAck(packet *transport.Packet) {
 
 }
+
 // Pump for reading
 func (client *Client) readPump() {
+	logrus.Infof("Client: %s readpump started", client.uuid)
+	defer logrus.Infof("Client: %s readpump stopped", client.uuid)
+
 	for {
 		_, msg, err := client.ws.ReadMessage()
 
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err) {
-				logrus.Error("Disconnect during read:")
-				client.disconnectError(err)
-				return
-			}
-			logrus.Error(err)
+			client.disconnectError(err)
+			client.stopc <- struct{}{}
+			return
 		}
 		client.onPacket(msg)
 	}
@@ -149,19 +155,32 @@ func (client *Client) readPump() {
 
 // Pump for writing
 func (client *Client) writePump() {
+	logrus.Infof("Client: %s writepump started", client.uuid)
+	defer logrus.Infof("Client: %s writepump stopped", client.uuid)
+
 	for {
 		select {
 			case msg := <-client.wc:
 				if err := client.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
-					if websocket.IsUnexpectedCloseError(err) {
-						logrus.Error("Disconnect during write")
-						client.disconnectError(err)
-						return
-					}
-					logrus.Error(err)
+					client.disconnectError(err)
+					return
 				}
+			case <- client.stopc:
+				return
 		}
 	}
+}
+
+func (client *Client) isOpen() bool {
+	client.mtx.RLock()
+	defer client.mtx.RUnlock()
+	return client.open
+}
+
+func (client *Client) close() {
+	client.mtx.Lock()
+	client.open = false
+	client.mtx.Unlock()
 }
 
 func (client *Client) destroy() {
@@ -180,13 +199,15 @@ func (client *Client) destroy() {
 
 func (client *Client) Disconnect() {
 	client.ws.Close()
+	client.close()
 	client.destroy()
 }
 
 func (client *Client) disconnectError(err error) {
+	client.close()
 	client.destroy()
 	logrus.Error(err)
-	logrus.Infof("Client connection closed, sessionid: %s", client.uuid)
+	logrus.Errorf("Client connection closed, sessionid: %s", client.uuid)
 }
 
 func (client *Client) GetSessionId() string {
@@ -254,8 +275,19 @@ func (client *Client) disconnectFromNamespaces() {
 	client.mtx.Unlock()
 }
 
+func (client *Client) notify(pType transport.PacketType, namespaceName string) {
+	client.SendPacket(&transport.Packet{
+		PacketType: pType,
+		Endpoint:	namespaceName,
+	})
+}
+
 // send message to client connection
 func (client *Client) SendPacket(packet *transport.Packet) {
+	if !client.isOpen() {
+		return
+	}
+
 	raw, err := json.Marshal(packet)
 	if err != nil {
 		logrus.Debug(Errors[FailedToParsePacket], err)
@@ -264,6 +296,10 @@ func (client *Client) SendPacket(packet *transport.Packet) {
 }
 
 func (client *Client) SendEvent(event string, data interface{}, namespaceName string) {
+	if !client.isOpen() {
+		return
+	}
+
 	packet := &transport.Packet{
 		Name: event,
 		Data: data,
@@ -279,5 +315,7 @@ func (client *Client) SendEvent(event string, data interface{}, namespaceName st
 
 // send message to client connection
 func (client *Client) SendRaw(data []byte) {
-	client.wc <- data
+	if client.isOpen() {
+		client.wc <- data
+	}
 }
