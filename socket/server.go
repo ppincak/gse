@@ -46,9 +46,16 @@ func NewServer(storeFactory socket.LocalStoreFactory, config *ServerConf) *Serve
 	return server
 }
 
+// warning: Thread unsafe
 func (server *Server) Run() {
 	go server.Namespace.Run()
 	server.isRunning = true
+}
+
+// warning: Thread unsafe
+func (server *Server) Stop() {
+	server.Namespace.Stop()
+	server.isRunning = false
 }
 
 func (server *Server) AddNamespace(namespaceName string) (*Namespace, error) {
@@ -60,6 +67,32 @@ func (server *Server) AddNamespace(namespaceName string) (*Namespace, error) {
 	server.namespaces[namespaceName] = namespace
 	go namespace.Run()
 	return namespace, nil
+}
+
+func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
+	ws, err := server.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+
+	client := NewClient(server, ws, server.storeFactory())
+	server.addClient(client)
+	logrus.Infof("Client connection established, sessionId: %s", client.GetSessionId())
+
+	go client.readPump()
+	go client.writePump()
+}
+
+func (server *Server) GetAllNamespaces() []*Namespace {
+	namespaces := make([]*Namespace, len(server.namespaces))
+
+	i := 0
+	for _, namespace := range server.namespaces {
+		namespaces[i] = namespace
+		i++
+	}
+	return namespaces
 }
 
 func (server *Server) addClient(client *Client) {
@@ -96,19 +129,4 @@ func (server *Server) removeNamespaceClient(client *Client, namespaceName string
 	}
 	namespace.removeClient(client)
 	return nil
-}
-
-func (server *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
-	ws, err := server.upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-
-	client := NewClient(server, ws, server.storeFactory())
-	server.addClient(client)
-	logrus.Infof("Client connection established, sessionId: %s", client.GetSessionId())
-
-	go client.readPump()
-	go client.writePump()
 }

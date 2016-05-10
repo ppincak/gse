@@ -171,7 +171,7 @@ func (namespace *Namespace) GetClient(sessiondId string) *Client {
 func (namespace *Namespace) SendEvent(event string, data interface{}) {
 	namespace.mtx.RLock()
 	for _, client := range namespace.clients {
-		client.SendEvent(event, data, namespace.name)
+		client.sendEvent(event, data, namespace.name)
 	}
 	namespace.mtx.RUnlock()
 }

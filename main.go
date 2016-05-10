@@ -27,10 +27,13 @@ func main() {
 		fmt.Println("connected")
 	})
 	n.Listen("click", func(client * socket.SocketClient, data interface{}) {
-
+		fmt.Println("click received", data)
 	})
-
 	server.Run()
+
+	server.Listen("dump", func(client * socket.SocketClient, data interface{}) {
+		fmt.Println("dump received", data)
+	})
 
 	go func(server *socket.Server) {
 		dur, err := time.ParseDuration("1s")

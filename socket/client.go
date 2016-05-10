@@ -125,7 +125,7 @@ func (client *Client) onEvent(packet *transport.Packet) error {
 	if err == nil {
 		namespace.evc <- &listenerEvent{
 			Name:		 	packet.Name,
-			Data: 			packet.Args,
+			Data: 			packet.Data,
 			ListenerType: 	eventListener,
 		}
 	}
@@ -266,6 +266,18 @@ func (client *Client) leaveAllRooms() {
 	client.mtx.Unlock()
 }
 
+func (client *Client) GetAllRooms() []*Room {
+	rooms := make([]*Room, len(client.rooms))
+
+	i := 0
+	for _, room := range client.rooms {
+		rooms[i] = room
+		i++
+	}
+
+	return rooms
+}
+
 func (client *Client) disconnectFromNamespaces() {
 	for _, namespace := range client.namespaces {
 		namespace.removeClient(client)
@@ -295,7 +307,7 @@ func (client *Client) SendPacket(packet *transport.Packet) {
 	client.wc <- raw
 }
 
-func (client *Client) SendEvent(event string, data interface{}, namespaceName string) {
+func (client *Client) sendEvent(event string, data interface{}, namespaceName string) {
 	if !client.isOpen() {
 		return
 	}
@@ -313,9 +325,17 @@ func (client *Client) SendEvent(event string, data interface{}, namespaceName st
 	client.wc <- raw
 }
 
-// send message to client connection
 func (client *Client) SendRaw(data []byte) {
 	if client.isOpen() {
 		client.wc <- data
 	}
+}
+
+func (client *SocketClient) Disconnect() {
+	client.namespace.removeClient(client.Client)
+	delete(client.namespaces, client.namespace.name)
+}
+
+func (client *SocketClient) SendEvent(event string, data interface{}) {
+	client.sendEvent(event, data, client.namespace.name)
 }

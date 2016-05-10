@@ -17,7 +17,6 @@
         });
 
         con.onConnect(function(){
-            console.log("on connect");
             let comments = gse.connect({
                 baseUrl: "ws://localhost:8080/socket.io/",
                 namespace: "/comments"
@@ -33,6 +32,14 @@
 
             con.listen("click", function(data) {
                 console.log("click received", data);
+            });
+
+            setTimeout(function() {
+                con.emit("dump", {name: "Casablanca"});
+            });
+
+            setTimeout(function() {
+                comments.emit("click", {name: "Joseph"});
             });
         });
 
