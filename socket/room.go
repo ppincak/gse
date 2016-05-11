@@ -58,14 +58,7 @@ func (room *Room) GetClients() []*Client {
 	return clients
 }
 
-// Disconnects clients from the room
-func (room *Room) Disconnect() {
-	for _, client := range room.clients {
-		client.leaveRoom(room)
-	}
-}
-
-func (room *Room) DestroyRoom() {
+func (room *Room) Destroy() {
 	for _, client := range room.clients {
 		client.leaveRoom(room)
 	}

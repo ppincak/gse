@@ -139,7 +139,7 @@ func (namespace *Namespace) RemoveRoom(roomName string) {
 	defer namespace.mtx.Unlock()
 	for _, room := range namespace.rooms {
 		if room.name == roomName {
-			room.DestroyRoom()
+			room.Destroy()
 			delete(namespace.rooms, roomName)
 			namespace.evc <- &listenerEvent{
 				ListenerType: roomRemListener,

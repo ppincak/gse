@@ -34,11 +34,6 @@ type Client struct {
 	open   		bool
 }
 
-type SocketClient struct {
-	*Client
-	namespace *Namespace
-}
-
 func NewClient(server *Server, ws *websocket.Conn, store socket.Store) (*Client) {
 	return &Client{
 		uuid: 		utils.GenerateUID(),
@@ -220,19 +215,6 @@ func (client *Client) addNamespace(namespace *Namespace) {
 	client.mtx.Unlock()
 }
 
-func (n *SocketClient) JoinRoom(roomName string) error {
-	room, err := n.namespace.GetRoom(roomName)
-    if err != nil {
-		return err
-	}
-
-	room.addClient(n.Client)
-	n.Client.mtx.Lock()
-	n.Client.rooms[room.uuid] = room
-	n.Client.mtx.Unlock()
-	return nil
-}
-
 func (client *Client) joinRoom(room *Room) {
 	client.mtx.Lock()
 	client.rooms[room.uuid] = room
@@ -329,6 +311,24 @@ func (client *Client) SendRaw(data []byte) {
 	if client.isOpen() {
 		client.wc <- data
 	}
+}
+
+type SocketClient struct {
+	*Client
+	namespace *Namespace
+}
+
+func (n *SocketClient) JoinRoom(roomName string) error {
+	room, err := n.namespace.GetRoom(roomName)
+	if err != nil {
+		return err
+	}
+
+	room.addClient(n.Client)
+	n.Client.mtx.Lock()
+	n.Client.rooms[room.uuid] = room
+	n.Client.mtx.Unlock()
+	return nil
 }
 
 func (client *SocketClient) Disconnect() {
