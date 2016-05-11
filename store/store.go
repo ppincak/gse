@@ -13,4 +13,4 @@ type Store interface {
 	Destroy()
 }
 
-type LocalStoreFactory func() Store
+type StoreFactory func() Store

@@ -205,6 +205,10 @@ func (client *Client) disconnectError(err error) {
 	logrus.Errorf("Client connection closed, sessionid: %s", client.uuid)
 }
 
+func (client *Client) Store() socket.Store {
+	return client.store
+}
+
 func (client *Client) GetSessionId() string {
 	return client.uuid
 }

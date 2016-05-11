@@ -58,6 +58,13 @@ func (room *Room) GetClients() []*Client {
 	return clients
 }
 
+func (room *Room) HasClient(sessionId string) bool {
+	room.mtx.RLock()
+	_, contains := room.clients[sessionId]
+	room.mtx.RUnlock()
+	return contains
+}
+
 func (room *Room) Destroy() {
 	for _, client := range room.clients {
 		client.leaveRoom(room)
@@ -68,8 +75,8 @@ func (room *Room) Destroy() {
 	room.mtx.Unlock()
 }
 
-func (room *Room) SendEvent(event string, data []interface{}) {
+func (room *Room) SendEvent(event string, data interface{}) {
 	for _, client := range room.clients {
-		client.sendEvent(event, data, "")
+		client.sendEvent(event, data, room.namespace.name)
 	}
 }

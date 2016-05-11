@@ -18,12 +18,12 @@ type Server struct {
 	// server configuration
 	conf         	*ServerConf
 	//  store factory
-	storeFactory 	socket.LocalStoreFactory
+	storeFactory 	socket.StoreFactory
 	// flag indicating that the server is running
 	isRunning		bool
 }
 
-func NewServer(storeFactory socket.LocalStoreFactory, config *ServerConf) *Server {
+func NewServer(storeFactory socket.StoreFactory, config *ServerConf) *Server {
 	if storeFactory == nil {
 		storeFactory = socket.NewLocalStore
 	}
