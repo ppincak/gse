@@ -48,13 +48,13 @@ func (room *Room) removeClient(client *Client) {
 }
 
 func (room *Room) GetClients() []*Client {
-	room.mtx.Lock()
+	room.mtx.RLock()
+	defer room.mtx.RUnlock()
 	clients := make([]*Client, len(room.clients))
 	i := 0
 	for _, client := range room.clients {
 		clients[i] = client
 	}
-	room.mtx.Unlock()
 	return clients
 }
 

@@ -25,8 +25,6 @@ type listenerType int
 const(
 	connectListener listenerType = iota
 	disconnectListener
-	roomAddListener
-	roomRemListener
 	eventListener
 )
 
@@ -80,20 +78,6 @@ func (lst *Listeners) AddDisconnectListener(listener DisconnectListener) {
 	lst.liregc <- registerListener{
 		listenerType: disconnectListener,
 		DisconnectListener: listener,
-	}
-}
-
-func (lst *Listeners) AddRoomAddListener(listener RoomAddListener) {
-	lst.liregc <- registerListener{
-		listenerType: roomAddListener,
-		RoomAddListener: listener,
-	}
-}
-
-func (lst *Listeners) AddRoomRemoveListener(listener RoomRemListener) {
-	lst.liregc <- registerListener{
-		listenerType: roomRemListener,
-		RoomRemListener: listener,
 	}
 }
 

@@ -56,12 +56,6 @@ func (namespace *Namespace)  Run() {
 					case disconnectListener:
 						logrus.Infof("Namespace: %s - registering disconnect listener", namespace.name)
 						l.clientDis = append(l.clientDis, msg.DisconnectListener)
-					case roomAddListener:
-						logrus.Infof("Namespace: %s - adding listener to room creation", namespace.name)
-						l.roomAdd = append(l.roomAdd, msg.RoomAddListener)
-					case roomRemListener:
-						logrus.Infof("Namespace: %s - removing listener to room creation", namespace.name)
-						l.roomRem = append(l.roomRem, msg.RoomRemListener)
 					case eventListener:
 						logrus.Infof("Namespace: %s - registering listener for event: %s", namespace.name,  msg.event)
 						if listeners, ok := l.events[msg.event]; ok {
@@ -79,14 +73,6 @@ func (namespace *Namespace)  Run() {
 				case disconnectListener:
 					for _, listener := range l.clientDis {
 						listener(evt.Client.wrap(namespace))
-					}
-				case roomAddListener:
-					for _, listener := range l.roomAdd {
-						listener(evt.Room)
-					}
-				case roomRemListener:
-					for _, listener := range l.roomRem {
-						listener(evt.Room)
 					}
 				case eventListener:
 					if listeners, ok := l.events[evt.Name]; ok {
@@ -116,10 +102,6 @@ func (namespace *Namespace) AddRoom(roomName string) string {
 	room := NewRoom(namespace, roomName)
 	namespace.rooms[room.uuid] = room
 	namespace.mtx.Unlock()
-	namespace.evc <- &listenerEvent{
-		ListenerType: roomAddListener,
-		Room: room,
-	}
 	return room.uuid
 }
 
@@ -134,6 +116,18 @@ func (namespace *Namespace) GetRoom(roomName string) (*Room, error) {
 	return nil, errors.New("Room not found")
 }
 
+func (namespace *Namespace) GetRooms() []*Room {
+	namespace.mtx.RLock()
+	defer namespace.mtx.RUnlock()
+	rooms := make([]*Room, len(namespace.rooms))
+	i := 0
+	for _, room := range namespace.rooms {
+		rooms[i] = room
+		i++
+	}
+	return rooms
+}
+
 func (namespace *Namespace) RemoveRoom(roomName string) {
 	namespace.mtx.Lock()
 	defer namespace.mtx.Unlock()
@@ -141,10 +135,6 @@ func (namespace *Namespace) RemoveRoom(roomName string) {
 		if room.name == roomName {
 			room.Destroy()
 			delete(namespace.rooms, roomName)
-			namespace.evc <- &listenerEvent{
-				ListenerType: roomRemListener,
-				Room: room,
-			}
 			return
 		}
 	}
@@ -166,6 +156,18 @@ func (namespace *Namespace) GetClient(sessiondId string) *Client {
 	namespace.mtx.RUnlock()
 	defer namespace.mtx.RUnlock()
 	return namespace.clients[sessiondId]
+}
+
+func (namespace *Namespace) GetClients() []*Client {
+	namespace.mtx.RUnlock()
+	defer namespace.mtx.RUnlock()
+	clients := make([]*Client, len(namespace.clients))
+	i := 0
+	for _, client := range namespace.clients {
+		clients[i] = client
+		i++
+	}
+	return clients
 }
 
 func (namespace *Namespace) SendEvent(event string, data interface{}) {
