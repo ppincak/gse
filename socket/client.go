@@ -119,6 +119,7 @@ func (client *Client) onEvent(packet *transport.Packet) error {
 	namespace, err := client.on(packet)
 	if err == nil {
 		namespace.evc <- &listenerEvent{
+			Client: 		client,
 			Name:		 	packet.Name,
 			Data: 			packet.Data,
 			ListenerType: 	eventListener,
