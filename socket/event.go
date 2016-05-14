@@ -50,10 +50,6 @@ type Listeners struct {
 	clientDis 		[]DisconnectListener
 	// event listeners
 	events 			map[string] []EventListener
-	// room created channels
-	roomAdd			[]RoomAddListener
-	// room
-	roomRem			[]RoomRemListener
 }
 
 func newListeners() *Listeners {
@@ -62,8 +58,6 @@ func newListeners() *Listeners {
 		clientCon:  make([]ConnectListener, 0),
 		clientDis:	make([]DisconnectListener, 0),
 		events: 	make(map[string] []EventListener),
-		roomAdd:    make([]RoomAddListener, 0),
-		roomRem:    make([]RoomRemListener, 0),
 	}
 }
 
