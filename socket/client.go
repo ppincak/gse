@@ -364,9 +364,9 @@ func (client *SocketClient) SendEvent(event string, data interface{}) {
 }
 
 func (client *SocketClient) HasAck() bool {
-	return false
+	return client.ack != nil
 }
 
-func (client *SocketClient) GetAck() bool {
-	return false
+func (client *SocketClient) GetAck() *Ack {
+	return client.ack
 }
