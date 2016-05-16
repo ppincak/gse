@@ -71,7 +71,7 @@ func (client *Client) onPacket(bytes []byte) {
 		case transport.Event:
 			err = client.onEvent(packet)
 		case transport.Ack:
-			client.onAck(packet)
+			err = client.onAck(packet)
 	}
 
 	if err != nil {
@@ -118,18 +118,35 @@ func (client *Client) onDisconnect(packet *transport.Packet) error {
 func (client *Client) onEvent(packet *transport.Packet) error {
 	namespace, err := client.on(packet)
 	if err == nil {
-		namespace.evc <- &listenerEvent{
-			Client: 		client,
-			Name:		 	packet.Name,
-			Data: 			packet.Data,
-			ListenerType: 	eventListener,
-		}
+		namespace.evc <- client.makeEvent(packet)
 	}
 	return err
 }
 
-func (client *Client) onAck(packet *transport.Packet) {
+func (client *Client) makeEvent(packet *transport.Packet) *listenerEvent {
+	return &listenerEvent{
+		client: 		client,
+		mame:		 	packet.Name,
+		data: 			packet.Data,
+		listenerType: 	eventListener,
+	}
+}
 
+func (client *Client) onAck(packet *transport.Packet) error {
+	namespace, err := client.on(packet)
+	if packet.Id == 0 {
+		return errors.New("bad packet id generated on the client side")
+	}
+	if err == nil {
+		event := client.makeEvent(packet)
+		event.ack = &Ack{
+			id: 		packet.Id,
+			client: 	client,
+			namespace:  namespace,
+		}
+		namespace.evc <- event
+	}
+	return nil
 }
 
 // Pump for reading
@@ -320,6 +337,7 @@ func (client *Client) SendRaw(data []byte) {
 
 type SocketClient struct {
 	*Client
+	ack 	  *Ack
 	namespace *Namespace
 }
 
@@ -343,4 +361,12 @@ func (client *SocketClient) Disconnect() {
 
 func (client *SocketClient) SendEvent(event string, data interface{}) {
 	client.sendEvent(event, data, client.namespace.name)
+}
+
+func (client *SocketClient) HasAck() bool {
+	return false
+}
+
+func (client *SocketClient) GetAck() bool {
+	return false
 }

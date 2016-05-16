@@ -65,19 +65,21 @@ func (namespace *Namespace)  Run() {
 						}
 				}
 		case evt := <- namespace.evc:
-			switch evt.ListenerType {
+			switch evt.listenerType {
 				case connectListener:
 					for _, listener := range l.clientCon {
-						listener(evt.Client.wrap(namespace))
+						listener(evt.client.wrap(namespace))
 					}
 				case disconnectListener:
 					for _, listener := range l.clientDis {
-						listener(evt.Client.wrap(namespace))
+						listener(evt.client.wrap(namespace))
 					}
 				case eventListener:
-					if listeners, ok := l.events[evt.Name]; ok {
+					if listeners, ok := l.events[evt.mame]; ok {
 						for _, listener := range listeners {
-							listener(evt.Client.wrap(namespace), evt.Data)
+							socketClient := evt.client.wrap(namespace)
+							socketClient.ack = evt.ack
+							listener(socketClient, evt.data)
 						}
 					}
 				}
@@ -183,8 +185,8 @@ func (namespace *Namespace) addClient(client *Client) {
 	namespace.clients[client.uuid] = client
 	namespace.mtx.Unlock()
 	namespace.evc <- &listenerEvent{
-		ListenerType: connectListener,
-		Client: client,
+		listenerType: connectListener,
+		client: client,
 	}
 	client.notify(transport.Connect, namespace.name)
 }
@@ -194,8 +196,8 @@ func (namespace *Namespace) removeClient(client *Client) {
 	delete(namespace.clients, client.uuid)
 	namespace.mtx.Unlock()
 	namespace.evc <- &listenerEvent{
-		ListenerType: disconnectListener,
-		Client: client,
+		listenerType: disconnectListener,
+		client: client,
 	}
 	client.notify(transport.Disconnect, namespace.name)
 }

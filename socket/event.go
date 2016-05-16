@@ -26,15 +26,17 @@ const(
 
 type listenerEvent struct {
 	// type of the event
-	ListenerType listenerType
+	listenerType listenerType
 	// Name of the event
-	Name         string
+	mame         string
 	// Client receiving event
-	Client       *Client
+	client       *Client
 	// Room
-	Room         *Room
+	room         *Room
+	// Acknowledgment
+	ack          *Ack
 	// event data
-	Data         interface{}
+	data         interface{}
 }
 
 type Listeners struct {
