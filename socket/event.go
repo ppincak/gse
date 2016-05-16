@@ -1,8 +1,6 @@
 package socket
 
 type EventListener func(*SocketClient, interface{})
-type RoomAddListener func(room *Room)
-type RoomRemListener func(room *Room)
 type ConnectListener func(*SocketClient)
 type DisconnectListener func(*SocketClient)
 
@@ -14,8 +12,6 @@ type registerListener struct {
 	listenerType 		listenerType
 	event        		string
 	EventListener
-	RoomAddListener
-	RoomRemListener
 	ConnectListener
 	DisconnectListener
 }
