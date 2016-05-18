@@ -8,6 +8,8 @@ type Store interface {
 
 	Delete(string)
 
+	DeleteAndGet(string) interface{}
+
 	Has(string) bool
 
 	Destroy()

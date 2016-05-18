@@ -35,6 +35,14 @@ func (client *LocalStore) Delete(key string) {
 	client.mtx.Unlock()
 }
 
+func (client *LocalStore) DeleteAndGet(key string) interface {} {
+	client.mtx.Lock()
+	defer client.mtx.Unlock()
+	val := client.data[key]
+	delete(client.data, key)
+	return val
+}
+
 func (client *LocalStore) Has(key string) bool {
 	client.mtx.RLock()
 	_, ok := client.data[key]
