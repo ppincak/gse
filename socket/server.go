@@ -3,7 +3,7 @@ package socket
 import (
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"com.grid/gse/store"
+	"github.com/ppincak/gse/store"
 	"net/http"
 	"errors"
 )
