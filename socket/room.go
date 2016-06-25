@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"com.grid/gse/utils"
+	"github.com/ppincak/gse/utils"
 	"sync"
 )
 
