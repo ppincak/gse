@@ -1,0 +1,1 @@
+Simple go socket library based on gorilla websockets
