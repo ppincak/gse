@@ -99,12 +99,12 @@ func (namespace *Namespace) GetName() string {
 	return namespace.name
 }
 
-func (namespace *Namespace) AddRoom(roomName string) string {
+func (namespace *Namespace) AddRoom(roomName string) *Room {
 	namespace.mtx.Lock()
 	room := NewRoom(namespace, roomName)
 	namespace.rooms[room.uuid] = room
 	namespace.mtx.Unlock()
-	return room.uuid
+	return room
 }
 
 func (namespace *Namespace) GetRoom(roomName string) (*Room, error) {
