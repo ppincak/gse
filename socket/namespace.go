@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/sirupsen/logrus"
 	"github.com/ppincak/gse/socket/transport"
+	"github.com/ppincak/gse/socket/stats"
 )
 
 type Namespace struct {
@@ -104,6 +105,7 @@ func (namespace *Namespace) AddRoom(roomName string) *Room {
 	room := NewRoom(namespace, roomName)
 	namespace.rooms[room.uuid] = room
 	namespace.mtx.Unlock()
+	namespace.server.stats.Inc(stats.OpenedRooms)
 	return room
 }
 
@@ -137,6 +139,7 @@ func (namespace *Namespace) RemoveRoom(roomName string) {
 		if room.name == roomName {
 			room.Destroy()
 			delete(namespace.rooms, roomName)
+			namespace.server.stats.Inc(stats.ClosedRooms)
 			return
 		}
 	}

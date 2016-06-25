@@ -6,6 +6,7 @@ import (
 	"github.com/ppincak/gse/store"
 	"net/http"
 	"errors"
+	"github.com/ppincak/gse/socket/stats"
 )
 
 type Server struct {
@@ -17,8 +18,10 @@ type Server struct {
 	upgrader   		*websocket.Upgrader
 	// server configuration
 	conf         	*ServerConf
-	//  store factory
+	// store factory
 	storeFactory 	socket.StoreFactory
+	// server stats
+	stats			*stats.Stats
 	// flag indicating that the server is running
 	isRunning		bool
 }
@@ -41,6 +44,7 @@ func NewServer(storeFactory socket.StoreFactory, config *ServerConf) *Server {
 		namespaces:     make(map[string] *Namespace),
 		storeFactory: 	storeFactory,
 		conf: 			config,
+		stats:          stats.NewStats(),
 	}
 	server.Namespace = rootNamespace(server)
 	return server
@@ -100,6 +104,7 @@ func (server *Server) addClient(client *Client) {
 	server.clients[client.uuid] = client
 	server.mtx.Unlock()
 	client.addNamespace(server.Namespace)
+	server.stats.Inc(stats.OpenedConnections)
 }
 
 func (server *Server) addNamespaceClient(client *Client, namespaceName string) error {
@@ -116,8 +121,8 @@ func (server *Server) addNamespaceClient(client *Client, namespaceName string) e
 func (server *Server) removeClient(client *Client) {
 	server.mtx.Lock()
 	delete(server.Namespace.clients, client.uuid)
-	client.destroy()
 	server.mtx.Unlock()
+	server.stats.Inc(stats.ClosedConnections)
 }
 
 func (server *Server) removeNamespaceClient(client *Client, namespaceName string) error {

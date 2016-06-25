@@ -204,6 +204,8 @@ func (client *Client) destroy() {
 		namespace.removeClient(client)
 	}
 
+	client.server.removeClient(client)
+
 	client.namespaces = make(map[string]*Namespace);
 	client.rooms = make(map[string]*Room)
 }
