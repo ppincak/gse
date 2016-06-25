@@ -1,6 +1,6 @@
 package socket
 
-import "com.grid/gse/socket/transport"
+import "github.com/ppincak/gse/socket/transport"
 
 type Ack struct {
 	id        	int64

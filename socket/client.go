@@ -1,9 +1,9 @@
 package socket
 
 import (
-	"com.grid/gse/store"
-	"com.grid/gse/utils"
-	"com.grid/gse/socket/transport"
+	"github.com/ppincak/gse/store"
+	"github.com/ppincak/gse/utils"
+	"github.com/ppincak/gse/socket/transport"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"encoding/json"
