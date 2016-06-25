@@ -4,7 +4,7 @@ import (
 	"sync"
 	"errors"
 	"github.com/sirupsen/logrus"
-	"com.grid/gse/socket/transport"
+	"github.com/ppincak/gse/socket/transport"
 )
 
 type Namespace struct {
