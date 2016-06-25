@@ -26,7 +26,7 @@ type Client struct {
 	ws     		*websocket.Conn
 	// writer channel
 	wc     		chan []byte
-	//
+	// stop channel
 	stopc		chan struct{}
 	// write mutex
 	mtx    		*sync.RWMutex
@@ -149,7 +149,6 @@ func (client *Client) onAck(packet *transport.Packet) error {
 	return nil
 }
 
-// Pump for reading
 func (client *Client) readPump() {
 	logrus.Infof("Client: %s readpump started", client.uuid)
 	defer logrus.Infof("Client: %s readpump stopped", client.uuid)
@@ -166,7 +165,6 @@ func (client *Client) readPump() {
 	}
 }
 
-// Pump for writing
 func (client *Client) writePump() {
 	logrus.Infof("Client: %s writepump started", client.uuid)
 	defer logrus.Infof("Client: %s writepump stopped", client.uuid)

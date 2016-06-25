@@ -1,5 +1,5 @@
 {
-	"ImportPath": "com.grid/gse",
+	"ImportPath": "github.com/gse",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v62",
 	"Deps": [
