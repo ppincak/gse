@@ -54,12 +54,19 @@ func NewServer(storeFactory socket.StoreFactory, config *ServerConf) *Server {
 func (server *Server) Run() {
 	go server.Namespace.Run()
 	server.isRunning = true
+	server.stats.Run()
 }
 
 // warning: Thread unsafe
 func (server *Server) Stop() {
 	server.Namespace.Stop()
 	server.isRunning = false
+	server.stats.Stop()
+}
+
+// warning: stats may not be accurate
+func(server *Server) Stats() {
+	return server.stats.Clone()
 }
 
 func (server *Server) AddNamespace(namespaceName string) (*Namespace, error) {
