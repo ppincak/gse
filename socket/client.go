@@ -298,7 +298,6 @@ func (client *Client) notify(pType transport.PacketType, namespaceName string) {
 	})
 }
 
-// send message to client connection
 func (client *Client) SendPacket(packet *transport.Packet) {
 	if !client.isOpen() {
 		return

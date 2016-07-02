@@ -18,7 +18,7 @@ type Namespace struct {
 	clients		map[string]*Client
 	// listeners
 	*Listeners
-	// events 		channel
+	// events channel
 	evc       	chan *listenerEvent
 	// stopping channel
 	stopc     	chan struct{}

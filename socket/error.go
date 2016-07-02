@@ -2,6 +2,7 @@ package socket
 
 import "encoding/json"
 
+// TODO add more error messages
 var Errors = map[int]string{
 	RoomDoesNotExist: 		"Room doesnt exist",
 	ServerAlreadyRunning:	"Server is already running",
