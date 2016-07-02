@@ -17,7 +17,7 @@ type Stats struct {
 	ConnectionFailures uint64		`json:"connectionFailures"`
 	PacketFailures     uint64		`json:"PacketFailures"`
 	incrc              chan int
-	statc              chan <-chan Stats
+	statc              chan chan<- Stats
 	stopc              chan struct{}
 }
 
@@ -28,7 +28,7 @@ const (
 func NewStats() *Stats {
 	return &Stats{
 		incrc: make(chan int, StatsBufferSize),
-		statc: make(chan chan Stats),
+		statc: make(chan chan<- Stats),
 		stopc: make(chan struct{}),
 	}
 }
@@ -65,7 +65,7 @@ func (stats *Stats) Stop() {
 	stats.stopc <- struct{}{}
 }
 
-func (stats *Stats) Get(c chan Stats) {
+func (stats *Stats) Get(c chan<- Stats) {
 	stats.statc <- c
 }
 

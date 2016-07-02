@@ -65,7 +65,7 @@ func (server *Server) Stop() {
 }
 
 // warning: stats may not be accurate
-func(server *Server) Stats(c chan stats.Stats) {
+func(server *Server) Stats(c chan<- stats.Stats) {
 	server.stats.Get(c)
 }
 
