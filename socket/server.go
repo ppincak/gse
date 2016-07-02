@@ -64,7 +64,6 @@ func (server *Server) Stop() {
 	server.stats.Stop()
 }
 
-// warning: stats may not be accurate
 func(server *Server) Stats(c chan<- stats.Stats) {
 	server.stats.Get(c)
 }
