@@ -1,7 +1,5 @@
 package stats
 
-import "sync/atomic"
-
 const(
 	OpenedConnections = iota
 	ClosedConnections
@@ -19,6 +17,7 @@ type Stats struct {
 	ConnectionFailures uint64		`json:"connectionFailures"`
 	PacketFailures     uint64		`json:"PacketFailures"`
 	incrc              chan int
+	statc              chan <-chan Stats
 	stopc              chan struct{}
 }
 
@@ -29,6 +28,7 @@ const (
 func NewStats() *Stats {
 	return &Stats{
 		incrc: make(chan int, StatsBufferSize),
+		statc: make(chan chan Stats),
 		stopc: make(chan struct{}),
 	}
 }
@@ -52,6 +52,8 @@ func (stats *Stats) Run() {
 						case PacketFailures:
 							stats.PacketFailures++
 					}
+				case c := <- stats.statc:
+					c <- stats.Clone()
 				case <- stats.stopc:
 					return
 			}
@@ -63,12 +65,16 @@ func (stats *Stats) Stop() {
 	stats.stopc <- struct{}{}
 }
 
+func (stats *Stats) Get(c chan Stats) {
+	stats.statc <- c
+}
+
 func (stats *Stats) Inc(field int) {
 	stats.incrc <- field
 }
 
-func (stats *Stats) Clone() {
-	return &Stats {
+func (stats *Stats) Clone() Stats {
+	return Stats {
 		OpenedConnections:	stats.OpenedConnections,
 		ClosedConnections: 	stats.ClosedConnections,
 		OpenedRooms: 		stats.OpenedRooms,

@@ -65,8 +65,8 @@ func (server *Server) Stop() {
 }
 
 // warning: stats may not be accurate
-func(server *Server) Stats() {
-	return server.stats.Clone()
+func(server *Server) Stats(c chan stats.Stats) {
+	server.stats.Get(c)
 }
 
 func (server *Server) AddNamespace(namespaceName string) (*Namespace, error) {
